@@ -60,6 +60,460 @@ function qi_normalize_phone($value): ?string
 }
 
 /**
+ * Load CRM DB credentials from the local Rukovoditel config.
+ */
+function qi_crm_db_config(): ?array
+{
+    static $cache = null;
+    if ($cache !== null) {
+        return $cache;
+    }
+    $file = __DIR__ . '/../crm/config/database.php';
+    if (!is_file($file)) {
+        return $cache = null;
+    }
+    require_once $file;
+    if (defined('DB_SERVER') && defined('DB_SERVER_USERNAME') && defined('DB_DATABASE')) {
+        return $cache = [
+            'db_host' => (string)DB_SERVER,
+            'db_username' => (string)DB_SERVER_USERNAME,
+            'db_password' => (string)(defined('DB_SERVER_PASSWORD') ? DB_SERVER_PASSWORD : ''),
+            'db_name' => (string)DB_DATABASE,
+        ];
+    }
+    if (defined('DB_HOST') && defined('DB_USERNAME') && defined('DB_NAME')) {
+        return $cache = [
+            'db_host' => (string)DB_HOST,
+            'db_username' => (string)DB_USERNAME,
+            'db_password' => (string)(defined('DB_PASSWORD') ? DB_PASSWORD : ''),
+            'db_name' => (string)DB_NAME,
+        ];
+    }
+    return $cache = null;
+}
+
+/**
+ * Open a mysqli connection using the CRM database credentials.
+ */
+function qi_crm_db_connect(): ?mysqli
+{
+    $cfg = qi_crm_db_config();
+    if (!$cfg) {
+        return null;
+    }
+    $host = $cfg['db_host'];
+    $port = null;
+    if (strpos($host, ':') !== false) {
+        [$host, $portPart] = explode(':', $host, 2);
+        if ($portPart !== '') {
+            $port = (int)$portPart;
+        }
+    }
+    if ($port !== null) {
+        $mysqli = @new mysqli($host, $cfg['db_username'], $cfg['db_password'], $cfg['db_name'], $port);
+    } else {
+        $mysqli = @new mysqli($host, $cfg['db_username'], $cfg['db_password'], $cfg['db_name']);
+    }
+    if ($mysqli->connect_errno) {
+        error_log('quote_workflow_db_connect_error: ' . $mysqli->connect_error);
+        return null;
+    }
+    $mysqli->set_charset('utf8mb4');
+    return $mysqli;
+}
+
+/**
+ * Extract a CRM lead ID from the CRM API response payload.
+ */
+function qi_extract_crm_lead_id($crmResult): ?int
+{
+    if (!is_array($crmResult)) {
+        return null;
+    }
+    $body = $crmResult['body'] ?? null;
+    if (!is_string($body) || $body === '') {
+        return null;
+    }
+    $json = json_decode($body, true);
+    if (is_array($json)) {
+        foreach (['item_id', 'id', 'ID', 'itemId'] as $key) {
+            if (isset($json[$key]) && is_numeric($json[$key])) {
+                return (int)$json[$key];
+            }
+        }
+        if (isset($json['data']) && is_array($json['data'])) {
+            foreach (['item_id', 'id'] as $key) {
+                if (isset($json['data'][$key]) && is_numeric($json['data'][$key])) {
+                    return (int)$json['data'][$key];
+                }
+            }
+        }
+        foreach ($json as $value) {
+            if (is_array($value)) {
+                foreach (['item_id', 'id'] as $key) {
+                    if (isset($value[$key]) && is_numeric($value[$key])) {
+                        return (int)$value[$key];
+                    }
+                }
+            }
+        }
+    }
+    if (preg_match('/"item_id"\s*:\s*"?(?<id>\d+)/i', $body, $match)) {
+        return (int)$match['id'];
+    }
+    if (preg_match('/"id"\s*:\s*"?(?<id>\d+)/i', $body, $match)) {
+        return (int)$match['id'];
+    }
+    if (preg_match('/item_id=([0-9]+)/', $body, $match)) {
+        return (int)$match[1];
+    }
+    if (preg_match('/id=([0-9]+)/', $body, $match)) {
+        return (int)$match[1];
+    }
+    return null;
+}
+
+/**
+ * Insert or update the local quote workflow tracker.
+ */
+function qi_store_quote_workflow(array $payload, ?int $crmLeadId, array $crmResult): array
+{
+    $mysqli = qi_crm_db_connect();
+    if (!$mysqli) {
+        return ['status' => 'skipped', 'reason' => 'db_connect_failed'];
+    }
+    $lead = $payload['lead'] ?? [];
+    $estimate = $payload['estimate'] ?? [];
+
+    $estimateAmount = null;
+    if (isset($estimate['amount']) && is_numeric($estimate['amount'])) {
+        $estimateAmount = number_format((float)$estimate['amount'], 2, '.', '');
+    }
+
+    $vehicle = $lead['vehicle'] ?? [];
+    $token = bin2hex(random_bytes(16));
+
+    $sql = "INSERT INTO quote_workflow
+        (lead_name, lead_phone, lead_email, repair, vehicle_year, vehicle_make, vehicle_model,
+         estimate_amount, crm_lead_id, crm_response, status, confirmation_token)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'new', ?)";
+    $stmt = $mysqli->prepare($sql);
+    if (!$stmt) {
+        error_log('quote_workflow_prepare_failed: ' . $mysqli->error);
+        return ['status' => 'error', 'reason' => 'prepare_failed', 'error' => $mysqli->error];
+    }
+
+    $leadName = substr(trim((string)($lead['name'] ?? '')), 0, 250);
+    $leadPhone = substr(trim((string)($lead['phone'] ?? '')), 0, 63);
+    $leadEmail = substr(trim((string)($lead['email'] ?? '')), 0, 250);
+    $repair = substr(trim((string)($lead['repair'] ?? '')), 0, 250);
+    $vehicleYear = substr(trim((string)($vehicle['year'] ?? ($lead['year'] ?? ''))), 0, 31);
+    $vehicleMake = substr(trim((string)($vehicle['make'] ?? ($lead['make'] ?? ''))), 0, 127);
+    $vehicleModel = substr(trim((string)($vehicle['model'] ?? ($lead['model'] ?? ''))), 0, 127);
+    $crmResponse = isset($crmResult['body']) ? substr((string)$crmResult['body'], 0, 1000) : '';
+
+    $stmt->bind_param(
+        'ssssssssiss',
+        $leadName,
+        $leadPhone,
+        $leadEmail,
+        $repair,
+        $vehicleYear,
+        $vehicleMake,
+        $vehicleModel,
+        $estimateAmount,
+        $crmLeadId,
+        $crmResponse,
+        $token
+    );
+
+    if (!$stmt->execute()) {
+        $error = $stmt->error;
+        $stmt->close();
+        return ['status' => 'error', 'reason' => 'execute_failed', 'error' => $error];
+    }
+    $id = (int)$stmt->insert_id;
+    $stmt->close();
+    return ['status' => 'stored', 'id' => $id, 'token' => $token];
+}
+
+function qi_workflow_list(int $limit = 50, ?string $status = null): array
+{
+    $mysqli = qi_crm_db_connect();
+    if (!$mysqli) {
+        return [];
+    }
+    $sql = "SELECT * FROM quote_workflow";
+    if ($status !== null) {
+        $sql .= " WHERE status = ?";
+    }
+    $sql .= " ORDER BY created_at DESC";
+    if ($limit > 0) {
+        $sql .= " LIMIT ?";
+    }
+    $stmt = $mysqli->prepare($sql);
+    if (!$stmt) {
+        return [];
+    }
+    if ($status !== null && $limit > 0) {
+        $stmt->bind_param('si', $status, $limit);
+    } elseif ($status !== null) {
+        $stmt->bind_param('s', $status);
+    } elseif ($limit > 0) {
+        $stmt->bind_param('i', $limit);
+    }
+    if (!$stmt->execute()) {
+        $stmt->close();
+        return [];
+    }
+    $result = $stmt->get_result();
+    $rows = $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
+    $stmt->close();
+    return $rows ?: [];
+}
+
+function qi_workflow_find(int $id): ?array
+{
+    $mysqli = qi_crm_db_connect();
+    if (!$mysqli) {
+        return null;
+    }
+    $stmt = $mysqli->prepare("SELECT * FROM quote_workflow WHERE id = ?");
+    if (!$stmt) {
+        return null;
+    }
+    $stmt->bind_param('i', $id);
+    if (!$stmt->execute()) {
+        $stmt->close();
+        return null;
+    }
+    $result = $stmt->get_result();
+    $row = $result ? $result->fetch_assoc() : null;
+    $stmt->close();
+    return $row ?: null;
+}
+
+function qi_workflow_find_by_token(string $token): ?array
+{
+    $mysqli = qi_crm_db_connect();
+    if (!$mysqli) {
+        return null;
+    }
+    $stmt = $mysqli->prepare("SELECT * FROM quote_workflow WHERE confirmation_token = ?");
+    if (!$stmt) {
+        return null;
+    }
+    $stmt->bind_param('s', $token);
+    if (!$stmt->execute()) {
+        $stmt->close();
+        return null;
+    }
+    $result = $stmt->get_result();
+    $row = $result ? $result->fetch_assoc() : null;
+    $stmt->close();
+    return $row ?: null;
+}
+
+function qi_workflow_update(int $id, array $fields): bool
+{
+    if (!$fields) {
+        return true;
+    }
+    $mysqli = qi_crm_db_connect();
+    if (!$mysqli) {
+        return false;
+    }
+    $columns = [];
+    $types = '';
+    $values = [];
+    foreach ($fields as $column => $value) {
+        $columns[] = "`$column` = ?";
+        if (is_int($value)) {
+            $types .= 'i';
+        } elseif (is_float($value)) {
+            $types .= 'd';
+        } else {
+            $types .= 's';
+            if ($value === null) {
+                $value = null;
+            }
+        }
+        $values[] = $value;
+    }
+    $types .= 'i';
+    $values[] = $id;
+    $sql = "UPDATE quote_workflow SET " . implode(', ', $columns) . " WHERE id = ?";
+    $stmt = $mysqli->prepare($sql);
+    if (!$stmt) {
+        return false;
+    }
+    $stmt->bind_param($types, ...$values);
+    $ok = $stmt->execute();
+    $stmt->close();
+    return $ok;
+}
+
+function qi_workflow_require_admin_token(): void
+{
+    if (!defined('QUOTE_WORKFLOW_ADMIN_TOKEN') || QUOTE_WORKFLOW_ADMIN_TOKEN === '') {
+        http_response_code(500);
+        echo 'Admin token not configured.';
+        exit;
+    }
+    $token = $_GET['token'] ?? ($_POST['token'] ?? '');
+    if (!hash_equals((string)QUOTE_WORKFLOW_ADMIN_TOKEN, (string)$token)) {
+        http_response_code(403);
+        echo 'Access denied.';
+        exit;
+    }
+}
+
+function qi_workflow_send_sms(string $toRaw, string $body): array
+{
+    if (!function_exists('curl_init')) {
+        return ['status' => 'error', 'reason' => 'curl_missing'];
+    }
+    if (!defined('TWILIO_ACCOUNT_SID') || !defined('TWILIO_AUTH_TOKEN')) {
+        return ['status' => 'skipped', 'reason' => 'twilio_config_missing'];
+    }
+    $to = qi_normalize_phone($toRaw);
+    if ($to === null) {
+        return ['status' => 'error', 'reason' => 'invalid_destination', 'raw' => $toRaw];
+    }
+    $fromConfig = defined('TWILIO_SMS_FROM') && TWILIO_SMS_FROM ? (string)TWILIO_SMS_FROM : '';
+    if ($fromConfig === '' && defined('TWILIO_CALLER_ID') && TWILIO_CALLER_ID) {
+        $fromConfig = (string)TWILIO_CALLER_ID;
+    }
+    $from = $fromConfig !== '' ? qi_normalize_phone($fromConfig) : null;
+    $messagingServiceSid = defined('TWILIO_MESSAGING_SERVICE_SID') && TWILIO_MESSAGING_SERVICE_SID
+        ? trim((string)TWILIO_MESSAGING_SERVICE_SID)
+        : '';
+    if ($messagingServiceSid === '' && $from === null) {
+        return ['status' => 'error', 'reason' => 'twilio_from_missing'];
+    }
+    $payload = [
+        'To' => $to,
+        'Body' => $body,
+    ];
+    if ($messagingServiceSid !== '') {
+        $payload['MessagingServiceSid'] = $messagingServiceSid;
+    } else {
+        $payload['From'] = $from;
+    }
+    $url = 'https://api.twilio.com/2010-04-01/Accounts/' . rawurlencode((string)TWILIO_ACCOUNT_SID) . '/Messages.json';
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => http_build_query($payload),
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_CONNECTTIMEOUT => 5,
+        CURLOPT_TIMEOUT => 15,
+        CURLOPT_HTTPAUTH => CURLAUTH_BASIC,
+        CURLOPT_USERPWD => (string)TWILIO_ACCOUNT_SID . ':' . (string)TWILIO_AUTH_TOKEN,
+    ]);
+    $response = curl_exec($ch);
+    $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $errno = curl_errno($ch);
+    $error = curl_error($ch);
+    curl_close($ch);
+    if ($response === false) {
+        return ['status' => 'error', 'reason' => 'twilio_request_failed', 'curl_errno' => $errno, 'curl_error' => $error];
+    }
+    $decoded = json_decode((string)$response, true);
+    if ($httpCode >= 200 && $httpCode < 300) {
+        return [
+            'status' => 'sent',
+            'http' => $httpCode,
+            'sid' => $decoded['sid'] ?? null,
+            'to' => $to,
+        ];
+    }
+    return [
+        'status' => 'error',
+        'reason' => 'twilio_http_' . $httpCode,
+        'http' => $httpCode,
+        'twilio_response' => $decoded ?: (string)$response,
+        'curl_errno' => $errno,
+        'curl_error' => $error,
+    ];
+}
+
+function qi_workflow_send_email(string $to, string $subject, string $body, ?string $from = null): array
+{
+    if (!filter_var($to, FILTER_VALIDATE_EMAIL)) {
+        return ['status' => 'error', 'reason' => 'invalid_email'];
+    }
+    if (!function_exists('mail')) {
+        return ['status' => 'error', 'reason' => 'mail_function_missing'];
+    }
+    $headers = "Content-Type: text/plain; charset=UTF-8";
+    if ($from && filter_var($from, FILTER_VALIDATE_EMAIL)) {
+        $headers .= "\r\nFrom: {$from}";
+    } elseif (defined('QUOTE_NOTIFICATION_EMAIL_FROM') && QUOTE_NOTIFICATION_EMAIL_FROM) {
+        $headers .= "\r\nFrom: " . QUOTE_NOTIFICATION_EMAIL_FROM;
+    }
+    $ok = @mail($to, $subject, $body, $headers);
+    return $ok ? ['status' => 'sent'] : ['status' => 'error', 'reason' => 'mail_failed'];
+}
+
+function qi_workflow_send_confirmation(array $record, string $confirmUrl): array
+{
+    $messages = [];
+    $name = $record['lead_name'] ?: 'there';
+    $estimate = $record['estimate_amount'];
+    $repair = $record['repair'] ?: 'your vehicle service';
+    $line = $estimate ? "Your estimate for {$repair} is $" . number_format((float)$estimate, 2) . '.' : "We have your request for {$repair}.";
+    $body = "Hi {$name}, this is Mechanics Saint Augustine.\n{$line}\nPlease confirm here: {$confirmUrl}\nReply if you have questions.";
+    if (!empty($record['lead_phone'])) {
+        $messages['sms'] = qi_workflow_send_sms($record['lead_phone'], $body);
+    }
+    if (!empty($record['lead_email'])) {
+        $messages['email'] = qi_workflow_send_email(
+            $record['lead_email'],
+            'Mechanics Saint Augustine Estimate Confirmation',
+            $body
+        );
+    }
+    return $messages;
+}
+
+function qi_workflow_send_invoice(array $record, string $invoiceUrl, string $provider): array
+{
+    $messages = [];
+    $name = $record['lead_name'] ?: 'there';
+    $body = "Hi {$name}, your invoice is ready with Mechanics Saint Augustine.\nSecure {$provider} link: {$invoiceUrl}\nPlease pay at your earliest convenience.";
+    if (!empty($record['lead_phone'])) {
+        $messages['sms'] = qi_workflow_send_sms($record['lead_phone'], $body);
+    }
+    if (!empty($record['lead_email'])) {
+        $messages['email'] = qi_workflow_send_email(
+            $record['lead_email'],
+            'Mechanics Saint Augustine Invoice',
+            $body
+        );
+    }
+    return $messages;
+}
+
+function qi_workflow_send_review_request(array $record, string $reviewUrl): array
+{
+    $messages = [];
+    $name = $record['lead_name'] ?: 'there';
+    $body = "Hi {$name}, thanks for choosing Mechanics Saint Augustine!\nCould you leave us a quick review? {$reviewUrl}\nWe appreciate your feedback.";
+    if (!empty($record['lead_phone'])) {
+        $messages['sms'] = qi_workflow_send_sms($record['lead_phone'], $body);
+    }
+    if (!empty($record['lead_email'])) {
+        $messages['email'] = qi_workflow_send_email(
+            $record['lead_email'],
+            'Quick Review Request',
+            $body
+        );
+    }
+    return $messages;
+}
+
+/**
  * Quick local pricing matrix mirroring the public quote widget.
  */
 function qi_local_estimate(array $lead): ?array
@@ -1390,6 +1844,8 @@ $notificationPayload = [
 $email_notification = qi_notify_email($notificationPayload);
 $owner_sms_notification = qi_notify_owner_sms($notificationPayload);
 $webhook_notification = qi_notify_status_webhook($notificationPayload);
+$crm_lead_id = qi_extract_crm_lead_id($crm_result);
+$workflow_tracker = qi_store_quote_workflow($notificationPayload, $crm_lead_id, $crm_result);
 
 // Build response
 $response = [
@@ -1431,6 +1887,9 @@ $response = [
             'owner_sms' => $owner_sms_notification,
             'webhook' => $webhook_notification,
         ],
+        'workflow' => array_merge([
+            'crm_lead_id' => $crm_lead_id,
+        ], $workflow_tracker),
         'meta' => array_merge([
             'received_at' => $receivedAt,
         ], $metaOverrides),

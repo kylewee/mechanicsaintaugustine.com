@@ -1,6 +1,29 @@
+# Dependencies
 node_modules/
+
+# Build outputs
 dist/
 .build/
+
+# Environment and configuration
 .env
+config.local.php
+
+# IDE
 .vscode/
+
+# Ignore backup files
+backups/
+*.tar.gz
+*.backup
+
+# Ignore temporary files
+tmp/
+temp/
+*.tmp
+
+# Ignore logs
+*.log
+api/quote_intake.log
+api/sms_incoming.log
 <file>
