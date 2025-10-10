@@ -397,8 +397,8 @@ if (
 $sms_result = null;
 $text_opt_in = !empty($data['text_opt_in']);
 if ($text_opt_in && $estimate_result) {
-    $twilio_sid = 'REDACTED_TWILIO_SID';
-    $twilio_token = getenv('TWILIO_AUTH_TOKEN') ?: '';
+    $twilio_sid = getenv('TWILIO_ACCOUNT_SID') ?: 'your_twilio_sid_here';
+    $twilio_token = getenv('TWILIO_AUTH_TOKEN') ?: 'your_twilio_token_here';
     $twilio_from = 'REDACTED_TWILIO_FROM';
     
     if ($twilio_token) {

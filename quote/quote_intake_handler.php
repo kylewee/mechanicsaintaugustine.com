@@ -513,6 +513,385 @@ function qi_workflow_send_review_request(array $record, string $reviewUrl): arra
     return $messages;
 }
 
+function qi_workflow_confirm_url(string $token): string
+{
+    if (defined('QUOTE_CONFIRMATION_BASE_URL') && QUOTE_CONFIRMATION_BASE_URL) {
+        $base = rtrim((string)QUOTE_CONFIRMATION_BASE_URL, '/');
+        return $base . '/quote/quote_intake_handler.php?confirm_token=' . urlencode($token);
+    }
+    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://';
+    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+    $script = $_SERVER['SCRIPT_NAME'] ?? '/quote/quote_intake_handler.php';
+    return $scheme . $host . dirname($script) . '/quote_intake_handler.php?confirm_token=' . urlencode($token);
+}
+
+function qi_render_workflow_console(?string $statusFilter = null, ?string $message = null, ?string $error = null): void
+{
+    qi_workflow_require_admin_token();
+    header('Content-Type: text/html; charset=UTF-8');
+    $items = qi_workflow_list(200, $statusFilter !== '' ? $statusFilter : null);
+    $token = $_GET['token'] ?? '';
+    $statusOptions = [
+        '' => 'All',
+        'new' => 'New',
+        'research' => 'Research',
+        'awaiting_customer' => 'Awaiting Customer',
+        'confirmed' => 'Confirmed',
+        'scheduled' => 'Scheduled',
+        'work_in_progress' => 'Work In Progress',
+        'completed' => 'Completed',
+        'invoiced' => 'Invoiced',
+        'paid' => 'Paid',
+        'review_requested' => 'Review Requested',
+    ];
+    echo "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Quote Workflow Console</title>";
+    echo "<style>body{font-family:Arial, sans-serif;background:#f4f6f8;margin:0;padding:0;}header{background:#0d6efd;color:#fff;padding:16px;}main{padding:16px;}table{border-collapse:collapse;width:100%;margin-bottom:24px;}th,td{border:1px solid #ddd;padding:8px;vertical-align:top;}th{background:#f0f3f9;text-align:left;}form{margin:0;}textarea{width:100%;height:80px;}input[type=text],input[type=number],input[type=url]{width:100%;padding:6px;margin:4px 0;}fieldset{border:1px solid #ddd;margin-bottom:16px;padding:8px;}legend{font-weight:bold;}button{margin:4px 4px 0 0;padding:8px 16px;background:#0d6efd;color:#fff;border:none;border-radius:4px;cursor:pointer;}button.secondary{background:#6c757d;}button.danger{background:#dc3545;} .flash{padding:10px;border-radius:6px;margin-bottom:16px;} .flash.success{background:#d1e7dd;color:#0f5132;} .flash.error{background:#f8d7da;color:#842029;}</style>";
+    echo "</head><body>";
+    echo "<header><h1>Quote Workflow Console</h1></header><main>";
+    if ($message) {
+        echo '<div class="flash success">' . htmlspecialchars($message, ENT_QUOTES, 'UTF-8') . '</div>';
+    }
+    if ($error) {
+        echo '<div class="flash error">' . htmlspecialchars($error, ENT_QUOTES, 'UTF-8') . '</div>';
+    }
+    echo '<form method="get" style="margin-bottom:16px;">';
+    echo '<input type="hidden" name="view" value="workflow">';
+    echo '<input type="hidden" name="token" value="' . htmlspecialchars($token, ENT_QUOTES, 'UTF-8') . '">';
+    echo '<label>Status Filter: <select name="status">';
+    foreach ($statusOptions as $value => $label) {
+        $selected = ($value === ($statusFilter ?? '')) ? ' selected' : '';
+        echo '<option value="' . htmlspecialchars($value, ENT_QUOTES, 'UTF-8') . '"' . $selected . '>' . htmlspecialchars($label, ENT_QUOTES, 'UTF-8') . '</option>';
+    }
+    echo '</select></label> <button type="submit">Apply</button>';
+    echo '</form>';
+    if (!$items) {
+        echo '<p>No leads found for this filter.</p>';
+    }
+    foreach ($items as $item) {
+        echo '<fieldset><legend>Lead #' . (int)$item['id'] . ' | ' . htmlspecialchars($item['lead_name'] ?? '', ENT_QUOTES, 'UTF-8') . '</legend>';
+        echo '<p><strong>Created:</strong> ' . htmlspecialchars($item['created_at'], ENT_QUOTES, 'UTF-8') . ' | <strong>Status:</strong> ' . htmlspecialchars($item['status'], ENT_QUOTES, 'UTF-8') . '</p>';
+        echo '<p><strong>Contact:</strong> ' . htmlspecialchars($item['lead_phone'], ENT_QUOTES, 'UTF-8');
+        if (!empty($item['lead_email'])) {
+            echo ' | ' . htmlspecialchars($item['lead_email'], ENT_QUOTES, 'UTF-8');
+        }
+        echo '</p>';
+        echo '<p><strong>Repair:</strong> ' . htmlspecialchars($item['repair'], ENT_QUOTES, 'UTF-8') . ' | <strong>Vehicle:</strong> ' . htmlspecialchars(trim(($item['vehicle_year'] ?? '') . ' ' . ($item['vehicle_make'] ?? '') . ' ' . ($item['vehicle_model'] ?? '')), ENT_QUOTES, 'UTF-8') . '</p>';
+        if (!empty($item['estimate_amount'])) {
+            echo '<p><strong>Estimate:</strong> $' . htmlspecialchars(number_format((float)$item['estimate_amount'], 2), ENT_QUOTES, 'UTF-8') . '</p>';
+        }
+        if (!empty($item['preferred_schedule'])) {
+            echo '<p><strong>Preferred Schedule:</strong> ' . htmlspecialchars($item['preferred_schedule'], ENT_QUOTES, 'UTF-8') . '</p>';
+        }
+        echo '<form method="post">';
+        echo '<input type="hidden" name="token" value="' . htmlspecialchars($token, ENT_QUOTES, 'UTF-8') . '">';
+        echo '<input type="hidden" name="id" value="' . (int)$item['id'] . '">';
+        echo '<input type="hidden" name="status_filter" value="' . htmlspecialchars($statusFilter ?? '', ENT_QUOTES, 'UTF-8') . '">';
+        echo '<label>Parts Supplier<input type="text" name="parts_supplier" value="' . htmlspecialchars($item['parts_supplier'] ?? '', ENT_QUOTES, 'UTF-8') . '"></label>';
+        echo '<label>Parts Quote ($)<input type="number" step="0.01" name="parts_quote" value="' . htmlspecialchars($item['parts_quote'] ?? '', ENT_QUOTES, 'UTF-8') . '"></label>';
+        echo '<label>Parts Details<textarea name="parts_details">' . htmlspecialchars($item['parts_details'] ?? '', ENT_QUOTES, 'UTF-8') . '</textarea></label>';
+        echo '<label>Labor Hours<input type="number" step="0.1" name="labor_hours" value="' . htmlspecialchars($item['labor_hours'] ?? '', ENT_QUOTES, 'UTF-8') . '"></label>';
+        echo '<label>Labor Rate ($/hr)<input type="number" step="0.01" name="labor_rate" value="' . htmlspecialchars($item['labor_rate'] ?? '', ENT_QUOTES, 'UTF-8') . '"></label>';
+        echo '<label>Manual Notes<textarea name="manual_notes">' . htmlspecialchars($item['manual_notes'] ?? '', ENT_QUOTES, 'UTF-8') . '</textarea></label>';
+        echo '<label>Preferred Schedule<input type="text" name="preferred_schedule" value="' . htmlspecialchars($item['preferred_schedule'] ?? '', ENT_QUOTES, 'UTF-8') . '" placeholder=\"e.g. Thu 2-4 PM\"></label>';
+        echo '<label>Estimate Total ($)<input type="number" step="0.01" name="estimate_amount" value="' . htmlspecialchars($item['estimate_amount'] ?? '', ENT_QUOTES, 'UTF-8') . '"></label>';
+        echo '<label>Status<select name="status">';
+        foreach ($statusOptions as $value => $label) {
+            if ($value === '') {
+                continue;
+            }
+            $selected = ($value === ($item['status'] ?? '')) ? ' selected' : '';
+            echo '<option value="' . htmlspecialchars($value, ENT_QUOTES, 'UTF-8') . '"' . $selected . '>' . htmlspecialchars($label, ENT_QUOTES, 'UTF-8') . '</option>';
+        }
+        echo '</select></label>';
+        echo '<label>Invoice Link<input type="url" name="invoice_link" value="' . htmlspecialchars($item['invoice_link'] ?? '', ENT_QUOTES, 'UTF-8') . '"></label>';
+        echo '<label>Payment Provider<input type="text" name="payment_provider" value="' . htmlspecialchars($item['payment_provider'] ?? '', ENT_QUOTES, 'UTF-8') . '" placeholder=\"Stripe/PayPal\"></label>';
+        $reviewDefault = $item['review_link'] ?? (defined('QUOTE_REVIEW_LINK') ? QUOTE_REVIEW_LINK : '');
+        echo '<label>Review Link<input type="url" name="review_link" value="' . htmlspecialchars($reviewDefault ?? '', ENT_QUOTES, 'UTF-8') . '"></label>';
+        echo '<div style="margin-top:8px;">';
+        echo '<button type="submit" name="workflow_action" value="save">Save / Update</button>';
+        echo '<button type="submit" name="workflow_action" value="send_confirmation">Send Confirmation</button>';
+        echo '<button type="submit" name="workflow_action" value="mark_confirmed">Mark Confirmed</button>';
+        echo '<button type="submit" name="workflow_action" value="mark_scheduled">Mark Scheduled</button>';
+        echo '<button type="submit" name="workflow_action" value="mark_completed">Mark Completed</button>';
+        echo '<button type="submit" name="workflow_action" value="send_invoice">Send Invoice</button>';
+        echo '<button type="submit" name="workflow_action" value="mark_paid">Mark Paid</button>';
+        echo '<button type="submit" name="workflow_action" value="send_review">Send Review Request</button>';
+        echo '</div>';
+        echo '</form>';
+        echo '</fieldset>';
+    }
+    echo '</main></body></html>';
+    exit;
+}
+
+function qi_handle_workflow_action(): void
+{
+    qi_workflow_require_admin_token();
+    $action = $_POST['workflow_action'] ?? '';
+    $id = isset($_POST['id']) ? (int)$_POST['id'] : 0;
+    $token = $_POST['token'] ?? '';
+    $statusFilter = $_POST['status_filter'] ?? '';
+    if ($id <= 0) {
+        qi_redirect_workflow($token, $statusFilter, null, 'Invalid lead ID.');
+    }
+    $record = qi_workflow_find($id);
+    if (!$record) {
+        qi_redirect_workflow($token, $statusFilter, null, 'Lead not found.');
+    }
+    $now = date('Y-m-d H:i:s');
+    switch ($action) {
+        case 'save':
+            $fields = [];
+            $fields['parts_supplier'] = trim((string)($_POST['parts_supplier'] ?? ''));
+            $fields['parts_quote'] = ($_POST['parts_quote'] !== '' ? (string)trim((string)$_POST['parts_quote']) : null);
+            $fields['parts_details'] = trim((string)($_POST['parts_details'] ?? ''));
+            $fields['labor_hours'] = ($_POST['labor_hours'] !== '' ? (string)trim((string)$_POST['labor_hours']) : null);
+            $fields['labor_rate'] = ($_POST['labor_rate'] !== '' ? (string)trim((string)$_POST['labor_rate']) : null);
+            $fields['manual_notes'] = trim((string)($_POST['manual_notes'] ?? ''));
+            $fields['preferred_schedule'] = trim((string)($_POST['preferred_schedule'] ?? ''));
+            if ($_POST['estimate_amount'] !== '') {
+                $fields['estimate_amount'] = number_format((float)$_POST['estimate_amount'], 2, '.', '');
+            }
+            if ($_POST['status'] ?? '') {
+                $fields['status'] = trim((string)$_POST['status']);
+            }
+            if ($_POST['invoice_link'] !== '') {
+                $fields['invoice_link'] = trim((string)$_POST['invoice_link']);
+            }
+            if ($_POST['payment_provider'] !== '') {
+                $fields['payment_provider'] = trim((string)$_POST['payment_provider']);
+            }
+            if ($_POST['review_link'] !== '') {
+                $fields['review_link'] = trim((string)$_POST['review_link']);
+            }
+            qi_workflow_update($id, $fields);
+            qi_redirect_workflow($token, $statusFilter, 'Lead updated.', null);
+            break;
+
+        case 'send_confirmation':
+            $preFields = [];
+            if ($_POST['estimate_amount'] !== '') {
+                $preFields['estimate_amount'] = number_format((float)$_POST['estimate_amount'], 2, '.', '');
+            }
+            if ($_POST['manual_notes'] !== '') {
+                $preFields['manual_notes'] = trim((string)$_POST['manual_notes']);
+            }
+            if ($_POST['preferred_schedule'] !== '') {
+                $preFields['preferred_schedule'] = trim((string)$_POST['preferred_schedule']);
+            }
+            if ($preFields) {
+                qi_workflow_update($id, $preFields);
+                $record = qi_workflow_find($id) ?? $record;
+            }
+            $tokenValue = $record['confirmation_token'] ?: bin2hex(random_bytes(16));
+            if ($tokenValue !== $record['confirmation_token']) {
+                qi_workflow_update($id, ['confirmation_token' => $tokenValue]);
+                $record['confirmation_token'] = $tokenValue;
+            }
+            $confirmUrl = qi_workflow_confirm_url($record['confirmation_token']);
+            $messages = qi_workflow_send_confirmation($record, $confirmUrl);
+            qi_workflow_update($id, [
+                'status' => 'awaiting_customer',
+                'confirmation_sent_at' => $now,
+            ]);
+            qi_redirect_workflow($token, $statusFilter, 'Confirmation sent.', null);
+            break;
+
+        case 'mark_confirmed':
+            qi_workflow_update($id, [
+                'status' => 'confirmed',
+                'customer_confirmed_at' => $now,
+            ]);
+            qi_redirect_workflow($token, $statusFilter, 'Lead marked as confirmed.', null);
+            break;
+
+        case 'mark_scheduled':
+            $preferred = trim((string)($_POST['preferred_schedule'] ?? ''));
+            qi_workflow_update($id, [
+                'status' => 'scheduled',
+                'preferred_schedule' => $preferred,
+                'schedule_link_sent_at' => $now,
+            ]);
+            qi_redirect_workflow($token, $statusFilter, 'Lead marked as scheduled.', null);
+            break;
+
+        case 'mark_completed':
+            qi_workflow_update($id, [
+                'status' => 'completed',
+                'work_completed_at' => $now,
+            ]);
+            qi_redirect_workflow($token, $statusFilter, 'Job marked as completed.', null);
+            break;
+
+        case 'send_invoice':
+            $invoiceLink = trim((string)($_POST['invoice_link'] ?? ''));
+            if ($invoiceLink === '') {
+                qi_redirect_workflow($token, $statusFilter, null, 'Invoice link required.');
+            }
+            $provider = trim((string)($_POST['payment_provider'] ?? 'Stripe'));
+            qi_workflow_update($id, [
+                'invoice_link' => $invoiceLink,
+                'invoice_sent_at' => $now,
+                'payment_provider' => $provider,
+                'status' => 'invoiced',
+            ]);
+            qi_workflow_send_invoice($record, $invoiceLink, $provider);
+            qi_redirect_workflow($token, $statusFilter, 'Invoice sent.', null);
+            break;
+
+        case 'mark_paid':
+            qi_workflow_update($id, [
+                'payment_status' => 'paid',
+                'paid_at' => $now,
+                'status' => 'paid',
+            ]);
+            qi_redirect_workflow($token, $statusFilter, 'Payment recorded.', null);
+            break;
+
+        case 'send_review':
+            $reviewLink = trim((string)($_POST['review_link'] ?? ''));
+            if ($reviewLink === '' && defined('QUOTE_REVIEW_LINK')) {
+                $reviewLink = (string)QUOTE_REVIEW_LINK;
+            }
+            if ($reviewLink === '') {
+                qi_redirect_workflow($token, $statusFilter, null, 'Review link required.');
+            }
+            qi_workflow_update($id, [
+                'review_link' => $reviewLink,
+                'review_sent_at' => $now,
+                'status' => 'review_requested',
+            ]);
+            qi_workflow_send_review_request($record, $reviewLink);
+            qi_redirect_workflow($token, $statusFilter, 'Review request sent.', null);
+            break;
+
+        default:
+            qi_redirect_workflow($token, $statusFilter, null, 'Unknown action.');
+    }
+}
+
+function qi_redirect_workflow(string $token, string $statusFilter, ?string $message, ?string $error): void
+{
+    $url = $_SERVER['PHP_SELF'] . '?view=workflow&token=' . urlencode($token);
+    if ($statusFilter !== '') {
+        $url .= '&status=' . urlencode($statusFilter);
+    }
+    if ($message) {
+        $url .= '&msg=' . urlencode($message);
+    }
+    if ($error) {
+        $url .= '&err=' . urlencode($error);
+    }
+    header('Location: ' . $url);
+    exit;
+}
+
+function qi_render_customer_confirmation(array $record, ?string $message = null, ?string $error = null): void
+{
+    header('Content-Type: text/html; charset=UTF-8');
+    echo "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Confirm Your Estimate</title>";
+    echo "<style>body{font-family:Arial, sans-serif;background:#f5f7fa;margin:0;padding:0;}main{max-width:600px;margin:40px auto;background:#fff;padding:24px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.1);}h1{margin-top:0;}label{display:block;margin-bottom:12px;}input,textarea{width:100%;padding:10px;margin-top:6px;border:1px solid #ccc;border-radius:6px;}button{width:100%;padding:12px;background:#0d6efd;color:#fff;border:none;border-radius:6px;font-size:1rem;cursor:pointer;}button:hover{background:#0b5ed7;}p.meta{color:#555;font-size:0.95rem;} .flash{padding:12px;border-radius:6px;margin-bottom:16px;} .flash.success{background:#d1e7dd;color:#0f5132;} .flash.error{background:#f8d7da;color:#842029;}</style>";
+    echo "</head><body><main>";
+    echo "<h1>Confirm Your Estimate</h1>";
+    if ($message) {
+        echo '<div class="flash success">' . htmlspecialchars($message, ENT_QUOTES, 'UTF-8') . '</div>';
+    }
+    if ($error) {
+        echo '<div class="flash error">' . htmlspecialchars($error, ENT_QUOTES, 'UTF-8') . '</div>';
+    }
+    echo '<p class="meta"><strong>Service:</strong> ' . htmlspecialchars($record['repair'], ENT_QUOTES, 'UTF-8') . '</p>';
+    if (!empty($record['estimate_amount'])) {
+        echo '<p class="meta"><strong>Estimated total:</strong> $' . htmlspecialchars(number_format((float)$record['estimate_amount'], 2), ENT_QUOTES, 'UTF-8') . '</p>';
+    }
+    $token = $_GET['confirm_token'] ?? '';
+    echo '<form method="post">';
+    echo '<input type="hidden" name="customer_action" value="confirm">';
+    echo '<input type="hidden" name="confirm_token" value="' . htmlspecialchars($token, ENT_QUOTES, 'UTF-8') . '">';
+    echo '<label>Preferred date & time (optional)<input type="text" name="preferred_schedule" placeholder="e.g. Friday at 2 PM" value="' . htmlspecialchars($record['preferred_schedule'] ?? '', ENT_QUOTES, 'UTF-8') . '"></label>';
+    echo '<label>Notes for the mechanic (optional)<textarea name="customer_notes" rows="3" placeholder="Anything else we should know?"></textarea></label>';
+    echo '<button type="submit">Confirm My Estimate</button>';
+    echo '</form>';
+    $ownerNumber = defined('TWILIO_FORWARD_TO') ? TWILIO_FORWARD_TO : '';
+    if ($ownerNumber !== '') {
+        echo '<p class="meta" style="margin-top:16px;">If you need to make changes, call or text us at ' . htmlspecialchars($ownerNumber, ENT_QUOTES, 'UTF-8') . '.</p>';
+    }
+    echo '</main></body></html>';
+    exit;
+}
+
+function qi_handle_customer_confirmation(): void
+{
+    $token = $_POST['confirm_token'] ?? '';
+    if ($token === '') {
+        qi_render_customer_confirmation_error('Missing confirmation token.');
+    }
+    $record = qi_workflow_find_by_token($token);
+    if (!$record) {
+        qi_render_customer_confirmation_error('We could not find your estimate. Please contact us directly.');
+    }
+    $preferred = trim((string)($_POST['preferred_schedule'] ?? ''));
+    $notes = trim((string)($_POST['customer_notes'] ?? ''));
+    $update = [
+        'status' => 'confirmed',
+        'customer_confirmed_at' => date('Y-m-d H:i:s'),
+    ];
+    if ($preferred !== '') {
+        $update['preferred_schedule'] = $preferred;
+    }
+    if ($notes !== '') {
+        $existing = trim((string)($record['manual_notes'] ?? ''));
+        $update['manual_notes'] = trim($existing . "\nCustomer note: " . $notes);
+    }
+    qi_workflow_update((int)$record['id'], $update);
+    $ownerMessage = "Lead confirmed: {$record['lead_name']} {$record['lead_phone']} - {$record['repair']}";
+    if ($preferred !== '') {
+        $ownerMessage .= " | Requested: {$preferred}";
+    }
+    if ($notes !== '') {
+        $ownerMessage .= " | Note: {$notes}";
+    }
+    if (defined('TWILIO_FORWARD_TO') && TWILIO_FORWARD_TO) {
+        qi_workflow_send_sms((string)TWILIO_FORWARD_TO, $ownerMessage);
+    }
+    if (defined('QUOTE_NOTIFICATION_EMAILS') && is_array(QUOTE_NOTIFICATION_EMAILS)) {
+        foreach (QUOTE_NOTIFICATION_EMAILS as $email) {
+            if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                qi_workflow_send_email($email, 'Lead Confirmed: ' . $record['lead_name'], $ownerMessage);
+            }
+        }
+    }
+    qi_render_customer_confirmation_success($record, $preferred);
+}
+
+function qi_render_customer_confirmation_error(string $message): void
+{
+    header('Content-Type: text/html; charset=UTF-8');
+    echo "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Confirmation Error</title></head><body style=\"font-family:Arial,sans-serif;background:#f5f7fa;\">";
+    echo "<main style=\"max-width:600px;margin:60px auto;background:#fff;padding:24px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.1);\">";
+    echo "<h2>We hit a snag</h2>";
+    echo '<p>' . htmlspecialchars($message, ENT_QUOTES, 'UTF-8') . '</p>';
+    echo '</main></body></html>';
+    exit;
+}
+
+function qi_render_customer_confirmation_success(array $record, ?string $preferredSchedule): void
+{
+    header('Content-Type: text/html; charset=UTF-8');
+    echo "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Estimate Confirmed</title></head>";
+    echo "<body style=\"font-family:Arial,sans-serif;background:#f5f7fa;\">";
+    echo "<main style=\"max-width:600px;margin:60px auto;background:#fff;padding:24px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.1);\">";
+    echo "<h2>Thanks, we've got it!</h2>";
+    echo "<p>Your estimate has been confirmed. We'll reach out shortly to lock in the appointment.</p>";
+    if ($preferredSchedule) {
+        echo "<p><strong>Your preferred time:</strong> " . htmlspecialchars($preferredSchedule, ENT_QUOTES, 'UTF-8') . "</p>";
+    }
+    if (defined('TWILIO_FORWARD_TO') && TWILIO_FORWARD_TO) {
+        echo "<p>If you need anything else, call or text us at " . htmlspecialchars(TWILIO_FORWARD_TO, ENT_QUOTES, 'UTF-8') . ".</p>";
+    }
+    echo "</main></body></html>";
+    exit;
+}
+
 /**
  * Quick local pricing matrix mirroring the public quote widget.
  */
@@ -1332,6 +1711,34 @@ function qi_normalize_slot($value): ?array
         ];
     } catch (Throwable $e) {
         return null;
+    }
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+    if (isset($_GET['view']) && $_GET['view'] === 'workflow') {
+        $statusFilter = $_GET['status'] ?? null;
+        $message = $_GET['msg'] ?? null;
+        $error = $_GET['err'] ?? null;
+        qi_render_workflow_console($statusFilter, $message, $error);
+    }
+    if (isset($_GET['confirm_token'])) {
+        $record = qi_workflow_find_by_token((string)$_GET['confirm_token']);
+        if (!$record) {
+            qi_render_customer_confirmation_error('We could not find your estimate. Please contact us directly.');
+        }
+        qi_render_customer_confirmation($record);
+    }
+    http_response_code(405);
+    echo json_encode(['error' => 'Method not allowed']);
+    exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (isset($_POST['workflow_action'])) {
+        qi_handle_workflow_action();
+    }
+    if (isset($_POST['customer_action'])) {
+        qi_handle_customer_confirmation();
     }
 }
 

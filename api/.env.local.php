@@ -2,7 +2,7 @@
 
 // Twilio Configuration for Voice System  
 const TWILIO_FORWARD_TO = '+19046634789';  // Your personal phone
-const TWILIO_ACCOUNT_SID = 'REDACTED_TWILIO_SID';  // Your Twilio Account SID
+const TWILIO_ACCOUNT_SID = 'your_twilio_sid_here';  // Your Twilio Account SID from environment
 const TWILIO_AUTH_TOKEN = 'REDACTED_TWILIO_TOKEN';
 const TWILIO_SMS_FROM = 'REDACTED_TWILIO_FROM';
 const CRM_API_URL = 'https://mechanicstaugustine.com/crm/api/rest.php';
@@ -12,6 +12,9 @@ const CRM_API_KEY = 'REDACTED_CRM_API_KEY';
 const QUOTE_NOTIFICATION_EMAILS = ['sodjacksonville@gmail.com'];
 const QUOTE_NOTIFICATION_EMAIL_FROM = '';
 const QUOTE_STATUS_WEBHOOK = '';
+const QUOTE_WORKFLOW_ADMIN_TOKEN = 'admin-token-change-me';
+const QUOTE_CONFIRMATION_BASE_URL = 'https://mechanicstaugustine.com';
+const QUOTE_REVIEW_LINK = 'https://g.page/r/Cc7RMechReview';
 
 // Status callback endpoint configuration
 const STATUS_CALLBACK_TOKEN = '';
