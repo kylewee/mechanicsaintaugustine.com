@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin To-Do · Mechanics Saint Augustine</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #0f172a;
+      --panel: rgba(15, 23, 42, 0.78);
+      --panel-muted: rgba(15, 23, 42, 0.55);
+      --accent: #38bdf8;
+      --accent-soft: rgba(56, 189, 248, 0.15);
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --border: rgba(148, 163, 184, 0.25);
+      font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: radial-gradient(circle at top, rgba(56, 189, 248, 0.25), transparent 60%),
+                  radial-gradient(circle at bottom, rgba(100, 116, 255, 0.2), transparent 65%),
+                  var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 48px 18px 80px;
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+      align-items: center;
+    }
+    header {
+      text-align: center;
+      max-width: 960px;
+    }
+    header h1 {
+      margin: 0 0 8px;
+      font-size: clamp(2rem, 3vw, 2.6rem);
+      letter-spacing: 0.05em;
+    }
+    header p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 1rem;
+    }
+    main {
+      width: min(1024px, 100%);
+      display: grid;
+      gap: 24px;
+    }
+    section {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 24px 26px;
+      box-shadow: 0 24px 60px rgba(15, 23, 42, 0.45);
+      backdrop-filter: blur(9px);
+    }
+    section h2 {
+      margin: 0 0 14px;
+      font-size: 1.3rem;
+      letter-spacing: 0.03em;
+    }
+    .list {
+      display: grid;
+      gap: 12px;
+      min-height: 80px;
+      padding: 10px;
+      border: 1px dashed var(--border);
+      border-radius: 14px;
+      background: var(--panel-muted);
+      transition: background 0.2s ease;
+    }
+    .list.drag-over {
+      background: rgba(56, 189, 248, 0.18);
+    }
+    li {
+      list-style: none;
+      display: grid;
+      gap: 6px;
+      padding: 14px 16px;
+      border-radius: 12px;
+      border: 1px solid rgba(148, 163, 184, 0.16);
+      background: rgba(15, 23, 42, 0.78);
+      cursor: grab;
+    }
+    li:active { cursor: grabbing; }
+    li header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      justify-content: space-between;
+    }
+    li .title {
+      font-weight: 600;
+      font-size: 1rem;
+    }
+    li .priority-badge {
+      padding: 2px 10px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 0.75rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    li p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.5;
+    }
+    .item-controls {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+    .item-controls label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+    .item-controls select {
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      padding: 4px 8px;
+      font-size: 0.85rem;
+    }
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+    .toolbar button {
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      background: rgba(56, 189, 248, 0.1);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 8px 14px;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+    .toolbar button:hover {
+      background: rgba(56, 189, 248, 0.18);
+    }
+    footer {
+      margin-top: 32px;
+      color: var(--muted);
+      font-size: 0.85rem;
+      text-align: center;
+    }
+    @media (max-width: 720px) {
+      body { padding: 32px 12px 64px; }
+      section { padding: 20px 20px; }
+      li p { font-size: 0.9rem; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Roadmap &amp; To-Do</h1>
+    <p>Drag items to set priority. Check completed work to archive it. Your changes save automatically in this browser.</p>
+  </header>
+
+  <main>
+    <section>
+      <div class="toolbar">
+        <h2>Active Initiatives</h2>
+        <button id="reset-btn" type="button">Reset to Default</button>
+      </div>
+      <ul id="todo-list" class="list" aria-label="Active to-do items"></ul>
+    </section>
+
+    <section>
+      <h2>Completed</h2>
+      <ul id="completed-list" class="list" aria-label="Completed items"></ul>
+    </section>
+  </main>
+
+  <footer>
+    <a href="/admin/" style="color: var(--accent); text-decoration: none;">&larr; Back to Admin Dashboard</a>
+  </footer>
+
+  <script>
+    const STORAGE_KEY = 'msa_todo_state_v1';
+    const defaultTasks = [
+      {
+        id: 'dispatch',
+        title: 'Smart Dispatch & Scheduling',
+        details: 'Map-based scheduling, drive-time optimization, and tech-on-the-way updates.',
+        priority: 'High',
+        completed: false
+      },
+      {
+        id: 'inspection',
+        title: 'Visual Vehicle Intake',
+        details: 'Guided inspection checklists with pre/post photos and customer-facing reports.',
+        priority: 'High',
+        completed: false
+      },
+      {
+        id: 'kits',
+        title: 'Parts & Job Kits',
+        details: 'Maintain service kits with labor hours, default pricing, and one-click ordering.',
+        priority: 'Medium',
+        completed: false
+      },
+      {
+        id: 'crm-history',
+        title: 'Customer History & CRM Automations',
+        details: 'Central customer view with service history and automated follow-ups.',
+        priority: 'Medium',
+        completed: false
+      },
+      {
+        id: 'payments',
+        title: 'Mobile Payment & E-signatures',
+        details: 'Quote-to-invoice flow with on-site payment capture and digital receipts.',
+        priority: 'High',
+        completed: false
+      },
+      {
+        id: 'tech-app',
+        title: 'Technician Mobile App View',
+        details: 'Field tech dashboard with job details, navigation, and live status updates.',
+        priority: 'Medium',
+        completed: false
+      },
+      {
+        id: 'self-service',
+        title: 'Self-Service Booking Widget',
+        details: 'Website widget for customers to request service slots tied to internal availability.',
+        priority: 'High',
+        completed: false
+      },
+      {
+        id: 'voice-automation',
+        title: 'Voice & SMS Automation',
+        details: 'Missed-call texts, transcription-to-lead, and A2P-compliant notifications.',
+        priority: 'Medium',
+        completed: false
+      },
+      {
+        id: 'analytics',
+        title: 'Operations Analytics Dashboard',
+        details: 'Pipeline, revenue by service type, technician utilization, and job duration metrics.',
+        priority: 'Low',
+        completed: false
+      }
+    ];
+
+    let state = loadState();
+
+    const todoList = document.getElementById('todo-list');
+    const completedList = document.getElementById('completed-list');
+    const resetBtn = document.getElementById('reset-btn');
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return { tasks: defaultTasks };
+        const parsed = JSON.parse(raw);
+        if (!parsed.tasks) throw new Error('invalid');
+        // merge with defaults in case new tasks were added
+        const merged = [...defaultTasks];
+        const allowedIds = new Set(defaultTasks.map(task => task.id));
+        parsed.tasks.forEach(saved => {
+          if (!allowedIds.has(saved.id)) return;
+          const idx = merged.findIndex(t => t.id === saved.id);
+          if (idx >= 0) {
+            merged[idx] = { ...merged[idx], ...saved };
+          } else {
+            merged.push(saved);
+          }
+        });
+        return { tasks: merged };
+      } catch (e) {
+        console.warn('Unable to load todo state, using defaults.', e);
+        return { tasks: defaultTasks };
+      }
+    }
+
+    function saveState() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+
+    function render() {
+      todoList.innerHTML = '';
+      completedList.innerHTML = '';
+      state.tasks.forEach(task => {
+        const li = document.createElement('li');
+        li.dataset.id = task.id;
+        li.draggable = !task.completed;
+        li.innerHTML = `
+          <header>
+            <span class="title">${task.title}</span>
+            <span class="priority-badge">${task.priority}</span>
+          </header>
+          <p>${task.details}</p>
+          <div class="item-controls">
+            <label>
+              <input type="checkbox" ${task.completed ? 'checked' : ''} /> Mark complete
+            </label>
+            <label>
+              Priority
+              <select ${task.completed ? 'disabled' : ''}>
+                <option value="High" ${task.priority === 'High' ? 'selected' : ''}>High</option>
+                <option value="Medium" ${task.priority === 'Medium' ? 'selected' : ''}>Medium</option>
+                <option value="Low" ${task.priority === 'Low' ? 'selected' : ''}>Low</option>
+              </select>
+            </label>
+          </div>
+        `;
+        const checkbox = li.querySelector('input[type="checkbox"]');
+        checkbox.addEventListener('change', () => toggleComplete(task.id, checkbox.checked));
+        const select = li.querySelector('select');
+        select.addEventListener('change', () => updatePriority(task.id, select.value));
+
+        if (!task.completed) {
+          attachDragHandlers(li);
+          todoList.appendChild(li);
+        } else {
+          completedList.appendChild(li);
+        }
+      });
+    }
+
+    function toggleComplete(id, completed) {
+      const task = state.tasks.find(t => t.id === id);
+      if (!task) return;
+      task.completed = completed;
+      saveState();
+      render();
+    }
+
+    function updatePriority(id, priority) {
+      const task = state.tasks.find(t => t.id === id);
+      if (!task) return;
+      task.priority = priority;
+      // move high priority tasks to top automatically if desired? we'll just sort by current order.
+      saveState();
+      render();
+    }
+
+    function resetState() {
+      if (!confirm('Reset the to-do list to the default order?')) return;
+      state = { tasks: defaultTasks.map(t => ({ ...t })) };
+      saveState();
+      render();
+    }
+
+    let draggedId = null;
+
+    function attachDragHandlers(el) {
+      el.addEventListener('dragstart', e => {
+        draggedId = e.currentTarget.dataset.id;
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', draggedId);
+      });
+    }
+
+    function handleDrop(targetList, targetId = null) {
+      if (!draggedId) return;
+      const draggedIndex = state.tasks.findIndex(t => t.id === draggedId);
+      if (draggedIndex === -1) return;
+      const [draggedTask] = state.tasks.splice(draggedIndex, 1);
+      const insertionIndex = targetId ? state.tasks.findIndex(t => t.id === targetId) : -1;
+      if (insertionIndex !== -1) {
+        state.tasks.splice(insertionIndex, 0, draggedTask);
+      } else {
+        state.tasks.push(draggedTask);
+      }
+      saveState();
+      render();
+      draggedId = null;
+    }
+
+    function setupListDrag(listEl) {
+      listEl.addEventListener('dragover', e => {
+        e.preventDefault();
+        listEl.classList.add('drag-over');
+      });
+      listEl.addEventListener('dragleave', () => listEl.classList.remove('drag-over'));
+      listEl.addEventListener('drop', e => {
+        e.preventDefault();
+        listEl.classList.remove('drag-over');
+        const targetItem = e.target.closest('li[data-id]');
+        const targetId = targetItem ? targetItem.dataset.id : null;
+        handleDrop(listEl, targetId);
+      });
+    }
+
+    setupListDrag(todoList);
+    // completed list doesn't accept drags (items go there via checkbox), but keep highlight support for clarity
+    completedList.addEventListener('dragover', e => e.preventDefault());
+    completedList.addEventListener('drop', e => e.preventDefault());
+
+    resetBtn.addEventListener('click', resetState);
+
+    render();
+  </script>
+</body>
+</html>

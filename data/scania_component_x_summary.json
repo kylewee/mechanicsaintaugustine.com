@@ -1,0 +1,48 @@
+{
+  "dataset": "SCANIA Component X",
+  "source": "https://doi.org/10.5878/jvb5-d390",
+  "training_rows": 23550,
+  "training_repairs": 2272,
+  "training_repair_rate": 0.09647558386411889,
+  "length_of_study": {
+    "median": 218.2,
+    "mean": 240.34901910828026,
+    "min": 73.4,
+    "max": 510.0
+  },
+  "max_time_step": {
+    "median": 215.2,
+    "mean": 234.76065392781317,
+    "min": 11.2,
+    "max": 507.4
+  },
+  "by_spec_0": {
+    "Cat0": {
+      "vehicles": 19221,
+      "repairs": 1977,
+      "repair_rate": 0.10285625097549556,
+      "median_length_of_study": 217.2,
+      "mean_length_of_study": 238.38218615056448,
+      "median_max_time_step": 213.6,
+      "mean_max_time_step": 232.77518339316373
+    },
+    "Cat1": {
+      "vehicles": 4291,
+      "repairs": 293,
+      "repair_rate": 0.06828245164297367,
+      "median_length_of_study": 233.6,
+      "mean_length_of_study": 249.21514798415288,
+      "median_max_time_step": 228.2,
+      "mean_max_time_step": 243.74117921230481
+    },
+    "Cat2": {
+      "vehicles": 38,
+      "repairs": 2,
+      "repair_rate": 0.05263157894736842,
+      "median_length_of_study": 216.5,
+      "mean_length_of_study": 234.03157894736842,
+      "median_max_time_step": 212.8,
+      "mean_max_time_step": 224.95263157894738
+    }
+  }
+}

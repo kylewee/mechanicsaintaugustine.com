@@ -36,7 +36,9 @@ echo '<?xml version="1.0" encoding="UTF-8"?>';
   <!-- Quick audible marker so we know the webhook responded -->
   <Say voice="alice">Connecting you now.</Say>
   <Pause length="1" />
-  <Dial record="record-from-answer"
+  <Dial record="record-from-answer-dual"
+        recordingTrack="both"
+        timeLimit="14400"
         answerOnBridge="true"
         callerId="REDACTED_TWILIO_FROM"
     action="<?=htmlspecialchars('https://' . $host . '/voice/recording_callback.php?action=dial', ENT_QUOTES)?>"

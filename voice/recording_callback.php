@@ -227,7 +227,7 @@ function create_crm_lead(array $leadData): array {
   }
 
   $post = [
-    'action'    => 'add_item',
+    'action'    => 'insert',
     'entity_id' => (int)CRM_LEADS_ENTITY_ID,
   ];
 
@@ -261,6 +261,23 @@ function create_crm_lead(array $leadData): array {
     $post['key'] = CRM_API_KEY;
   }
 
+  // Ensure REST payload includes credentials alongside token/key
+  if (!empty($post['token'])) {
+    if (defined('CRM_USERNAME') && CRM_USERNAME) {
+      $post['username'] = CRM_USERNAME;
+    }
+    if (defined('CRM_PASSWORD') && CRM_PASSWORD) {
+      $post['password'] = CRM_PASSWORD;
+    }
+  } elseif (!empty($post['key'])) {
+    if (defined('CRM_USERNAME') && CRM_USERNAME && !isset($post['username'])) {
+      $post['username'] = CRM_USERNAME;
+    }
+    if (defined('CRM_PASSWORD') && CRM_PASSWORD && !isset($post['password'])) {
+      $post['password'] = CRM_PASSWORD;
+    }
+  }
+
   // Synthesize name if needed
   if (empty($leadData['name'])) {
     $fn = trim((string)($leadData['first_name'] ?? ''));
@@ -276,6 +293,7 @@ function create_crm_lead(array $leadData): array {
 
   // Field mapping (allow auto-discovery for missing IDs)
   $fieldMap = resolve_field_map();
+  $itemPayload = [];
   if (is_array($fieldMap)) {
     foreach ($fieldMap as $key => $fid) {
       $fid = (int)$fid;
@@ -283,7 +301,18 @@ function create_crm_lead(array $leadData): array {
       if (!array_key_exists($key, $leadData)) continue;
       $val = (string)$leadData[$key];
       if ($val === '') continue;
-      $post['fields[field_' . $fid . ']'] = $val;
+      $fieldKey = 'field_' . $fid;
+      $itemPayload[$fieldKey] = $val;
+    }
+  }
+
+  if (defined('CRM_CREATED_BY_USER_ID')) {
+    $itemPayload['created_by'] = (int)CRM_CREATED_BY_USER_ID;
+  }
+
+  if (!empty($itemPayload)) {
+    foreach ($itemPayload as $fieldKey => $value) {
+      $post["items[0][$fieldKey]"] = $value;
     }
   }
 
@@ -303,7 +332,27 @@ function create_crm_lead(array $leadData): array {
   curl_close($ch);
   $result = ['http'=>$http, 'curl_errno'=>$errno, 'curl_error'=>$err, 'body'=>$resp];
 
+  $apiJson = null;
+  if ($resp !== false && $resp !== null && $resp !== '') {
+    $decoded = json_decode((string)$resp, true);
+    if (is_array($decoded)) {
+      $apiJson = $decoded;
+      $result['api_response'] = $decoded;
+    } else {
+      $result['api_parse_error'] = true;
+    }
+  }
+
   $shouldFallback = ($errno !== 0) || ($http >= 500) || ($resp === false);
+  if (!$shouldFallback) {
+    if (!is_array($apiJson)) {
+      $shouldFallback = true;
+    } elseif (isset($apiJson['status']) && strtolower((string)$apiJson['status']) !== 'success') {
+      $shouldFallback = true;
+      $result['api_error'] = $apiJson;
+    }
+  }
+
   if ($shouldFallback) {
     $dbRes = create_crm_lead_db_insert($leadData);
     $result['fallback'] = $dbRes;
@@ -545,6 +594,102 @@ function create_crm_lead_db_insert(array $leadData): array {
   } catch (Throwable $e) {
     return ['ok'=>false,'error'=>'exception','detail'=>$e->getMessage()];
   }
+}
+
+function auto_quote_from_call(array $leadData, array $context = []): array {
+  if (!function_exists('curl_init')) {
+    return ['status' => 'skipped', 'reason' => 'curl_missing'];
+  }
+  $phone = $leadData['phone'] ?? '';
+  if (!$phone) {
+    return ['status' => 'skipped', 'reason' => 'missing_phone'];
+  }
+  $phoneNormalized = preg_replace('/[^0-9+]/', '', (string)$phone);
+  if ($phoneNormalized && $phoneNormalized[0] !== '+') {
+    if (strlen($phoneNormalized) === 10) {
+      $phoneNormalized = '+1' . $phoneNormalized;
+    } elseif ($phoneNormalized[0] === '1' && strlen($phoneNormalized) === 11) {
+      $phoneNormalized = '+' . $phoneNormalized;
+    } else {
+      $phoneNormalized = '+' . $phoneNormalized;
+    }
+  }
+  $nameParts = [];
+  if (!empty($leadData['first_name'])) { $nameParts[] = trim((string)$leadData['first_name']); }
+  if (!empty($leadData['last_name'])) { $nameParts[] = trim((string)$leadData['last_name']); }
+  $name = trim(implode(' ', $nameParts));
+  if ($name === '') {
+    $name = trim((string)($leadData['name'] ?? 'Phone Lead')) ?: 'Phone Lead';
+  }
+  $address = isset($leadData['address']) ? trim((string)$leadData['address']) : '';
+  $zip = '';
+  if ($address && preg_match('/\b(\d{5})(?:-\d{4})?\b/', $address, $mZip)) {
+    $zip = $mZip[1];
+  }
+  $engine = (string)($leadData['engine'] ?? ($leadData['engine_size'] ?? ''));
+  $notes = (string)($leadData['notes'] ?? '');
+  $concern = $context['transcript'] ?? $notes;
+  if (strlen($concern) > 480) {
+    $concern = substr($concern, 0, 477) . '...';
+  }
+  $repair = (string)($leadData['repair'] ?? $notes);
+  if ($repair === '') {
+    $repair = 'Phone Consultation';
+  }
+  $payload = [
+    'name' => $name,
+    'phone' => $phoneNormalized ?: $phone,
+    'email' => '',
+    'repair' => $repair,
+    'year' => $leadData['year'] ?? '',
+    'make' => $leadData['make'] ?? '',
+    'model' => $leadData['model'] ?? '',
+    'engine' => $engine,
+    'street' => $address,
+    'zip' => $zip,
+    'text_opt_in' => true,
+    'vehicle_class' => $context['vehicle_class'] ?? 'heavy',
+    'service_location' => '',
+    'concern' => $concern,
+    'meta' => [
+      'skip_crm' => true,
+      'source' => 'voice_auto',
+      'recording_url' => $context['recording_url'] ?? null,
+    ],
+  ];
+  if (!empty($leadData['city'])) {
+    $payload['city'] = $leadData['city'];
+  }
+  if (!empty($leadData['state'])) {
+    $payload['state'] = $leadData['state'];
+  }
+  $endpoint = $context['quote_endpoint'] ?? 'http://127.0.0.1/quote/quote_intake_handler.php';
+  $ch = curl_init($endpoint);
+  if (!$ch) {
+    return ['status' => 'skipped', 'reason' => 'curl_init_failed'];
+  }
+  $postBody = json_encode($payload);
+  curl_setopt_array($ch, [
+    CURLOPT_POST => true,
+    CURLOPT_POSTFIELDS => $postBody,
+    CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'Content-Length: ' . strlen((string)$postBody)],
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_TIMEOUT => 5,
+    CURLOPT_CONNECTTIMEOUT => 2,
+  ]);
+  $response = curl_exec($ch);
+  $http = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+  $errno = curl_errno($ch);
+  $error = curl_error($ch);
+  curl_close($ch);
+  if ($response === false) {
+    return ['status' => 'error', 'reason' => 'curl', 'curl_errno' => $errno, 'curl_error' => $error];
+  }
+  $decoded = json_decode((string)$response, true);
+  if ($http >= 200 && $http < 300) {
+    return ['status' => 'ok', 'http' => $http, 'response' => $decoded];
+  }
+  return ['status' => 'error', 'http' => $http, 'response' => $decoded];
 }
 
 /**
@@ -1491,6 +1636,13 @@ if (($recordingUrl && $transcript) || (!$recordingUrl && $transcript)) {
   $crmResult = create_crm_lead($leadData);
   $log['crm_lead'] = $leadData;
   $log['crm_result'] = $crmResult;
+
+  $quoteForward = auto_quote_from_call($leadData, [
+    'recording_url' => $playableRecordingUrl,
+    'transcript' => $transcript,
+    'vehicle_class' => 'heavy',
+  ]);
+  $log['quote_forward'] = $quoteForward;
 
   // Post-create: email notification (SMTP when configured, else mail())
   try {

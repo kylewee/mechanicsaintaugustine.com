@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mechanics Saint Augustine · Admin Operations</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #0f172a;
+      --panel: rgba(15, 23, 42, 0.75);
+      --accent: #2563eb;
+      --accent-soft: rgba(37, 99, 235, 0.15);
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --border: rgba(148, 163, 184, 0.25);
+    }
+    body {
+      font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+      margin: 0;
+      background: radial-gradient(circle at top, rgba(37, 99, 235, 0.25), transparent 55%),
+                  radial-gradient(circle at bottom, rgba(14, 116, 144, 0.2), transparent 60%),
+                  var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 48px 16px 80px;
+    }
+    header {
+      max-width: 960px;
+      margin: 0 auto 32px;
+      text-align: center;
+    }
+    header h1 {
+      margin-bottom: 8px;
+      font-size: clamp(2.2rem, 3vw, 2.8rem);
+      letter-spacing: 0.04em;
+    }
+    header p {
+      color: var(--muted);
+      margin: 0;
+      font-size: 1.05rem;
+    }
+    main {
+      max-width: 1024px;
+      margin: 0 auto;
+      display: grid;
+      gap: 24px;
+    }
+    section {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px 28px;
+      box-shadow: 0 24px 60px rgba(15, 23, 42, 0.45);
+      backdrop-filter: blur(8px);
+    }
+    section h2 {
+      margin: 0 0 16px;
+      font-size: 1.35rem;
+      letter-spacing: 0.02em;
+    }
+              <p>Kid-friendly instructions for fixing everything:</p>
+              <h4>How to Fix Everything</h4>
+              <ol>
+                <li>Open the Terminal (the black box icon).</li>
+                <li>Type this command and press Enter:<br><code>sudo bash /mnt/sda5/mechanicsaintaugustine.com/site/admin/fix_everything.sh</code></li>
+                <li>Wait for it to finish. If you see any errors, copy them and send them to Kyle.</li>
+              </ol>
+              <p>If you need help, ask an adult or Kyle.</p>
+    ul.links {
+      list-style: none;
+      display: grid;
+      gap: 12px;
+      padding: 0;
+      margin: 0;
+    }
+    ul.links li {
+      background: rgba(15, 23, 42, 0.55);
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      border-radius: 12px;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    ul.links a {
+      color: var(--text);
+      font-weight: 600;
+      text-decoration: none;
+    }
+    ul.links a:hover {
+      color: var(--accent);
+    }
+    ul.links span {
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+    .commands {
+      display: grid;
+      gap: 16px;
+    }
+    .commands article {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px 18px;
+    }
+    .commands h3 {
+      margin: 0 0 8px;
+      font-size: 1rem;
+      letter-spacing: 0.01em;
+    }
+    pre {
+      margin: 0;
+      border-radius: 10px;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(37, 99, 235, 0.25);
+      padding: 12px 14px;
+      color: #cbd5f5;
+      overflow-x: auto;
+      font-size: 0.92rem;
+    }
+    code { font-family: "JetBrains Mono", "Courier New", monospace; }
+    .notes {
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin-top: 10px;
+      line-height: 1.5;
+    }
+    footer {
+      max-width: 1024px;
+      margin: 56px auto 0;
+      color: var(--muted);
+      text-align: center;
+      font-size: 0.85rem;
+    }
+    @media (max-width: 720px) {
+      body { padding: 32px 12px 64px; }
+      section { padding: 20px 18px; }
+      .commands { gap: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Mechanics Saint Augustine Admin</h1>
+    <p>One-stop dashboard for daily operations, testing, and deployment shortcuts.</p>
+  </header>
+
+  <main>
+    <section>
+      <h2>Quick Links</h2>
+      <ul class="links">
+        <li>
+          <a href="https://mechanicstaugustine.com/" target="_blank" rel="noopener">Public Website</a>
+          <span>Front-of-house landing page.</span>
+        </li>
+        <li>
+          <a href="https://mechanicstaugustine.com/quote/" target="_blank" rel="noopener">Quote Intake Form</a>
+          <span>Customer-facing estimator (PHP handler forwards to the Go API and CRM).</span>
+        </li>
+        <li>
+          <a href="https://mechanicstaugustine.com/crm/" target="_blank" rel="noopener">Rukovoditel CRM</a>
+          <span>Manage leads, quotes, and workflow.</span>
+        </li>
+        <li>
+          <a href="/admin/leads_approval.php">Lead Approvals</a>
+          <span>Flip quotes to approved and kick off parts ordering.</span>
+        </li>
+        <li>
+          <a href="/admin/parts_orders.php">Parts Order Tracker</a>
+          <span>Track suppliers, statuses, and line items.</span>
+        </li>
+        <li>
+          <a href="/admin/dispatch.php">Dispatch Board</a>
+          <span>Schedule visits, assign techs, and monitor job progress.</span>
+        </li>
+        <li>
+          <a href="/admin/todo.html">Roadmap Planner</a>
+          <span>Drag-and-drop to prioritize upcoming work.</span>
+        </li>
+        <li>
+          <a href="https://mechanicstaugustine.com/voice/call_status.php" target="_blank" rel="noopener">Voice Call Status</a>
+          <span>Health check for Twilio voice system.</span>
+        </li>
+        <li>
+          <a href="https://mechanicstaugustine.com/voice/recording_callback.php?action=recordings&amp;token=msarec-2b7c9f1a5d4e" target="_blank" rel="noopener">Call Recordings Console</a>
+          <span>Browse and download recent recordings (token protected).</span>
+        </li>
+        <li>
+          <a href="https://mechanicstaugustine.com/voice/test_incoming.php" target="_blank" rel="noopener">Simulate Incoming Call</a>
+          <span>Generates a faux inbound call &lt;Dial&gt; flow for testing.</span>
+        </li>
+        <li>
+          <a href="https://mechanicstaugustine.com/voice/test_webhook.php" target="_blank" rel="noopener">Simulate Recording Webhook</a>
+          <span>Writes a test entry to <code>voice.log</code> for debugging.</span>
+        </li>
+        <li>
+          <a href="https://console.twilio.com/us1/develop/phone-numbers/messaging/services/MG436fdf28d58037bd14cc9a2e4f0b25e1" target="_blank" rel="noopener">Twilio Messaging Service</a>
+          <span>Attach numbers, review A2P campaign approval status.</span>
+        </li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Code &amp; Deployment Commands</h2>
+      <div class="commands">
+        <article>
+          <h3>Run Go unit tests</h3>
+          <pre><code>cd /mnt/sdc4/mechanicsaintaugustine.com/site/backend
+go test ./...</code></pre>
+          <p class="notes">Confirms the Go platform backend compiles after changes.</p>
+        </article>
+        <article>
+          <h3>Start API locally (foreground)</h3>
+          <pre><code>cd /mnt/sdc4/mechanicsaintaugustine.com/site/backend
+LOG_LEVEL=debug go run ./cmd/api</code></pre>
+          <p class="notes">Runs the Go API on <code>http://127.0.0.1:8080</code>. Use <kbd>Ctrl+C</kbd> to stop.</p>
+        </article>
+        <article>
+          <h3>Quote intake forward test</h3>
+          <pre><code>export PLATFORM_API_URL="https://mechanicstaugustine.com"   # update if running locally
+curl -X POST "$PLATFORM_API_URL/public/quote-intake" \
+  -H "Content-Type: application/json" \
+  -d '{
+        "name": "Test Customer",
+        "phone": "+19040000000",
+        "vehicle": {"year": "2018", "make": "Honda", "model": "Civic"},
+        "repair": "Brake service"
+      }'</code></pre>
+          <p class="notes">Watch API logs for <code>quote_intake_received</code> entries. Submissions from the PHP form call this automatically.</p>
+        </article>
+        <article>
+          <h3>Fix CRM upload permissions</h3>
+          <pre><code>cd /mnt/sdc4/mechanicsaintaugustine.com/site
+sudo chown -R www-data:www-data crm/uploads crm/backups crm/tmp crm/cache crm/log
+sudo find crm/uploads crm/backups crm/tmp crm/cache crm/log -type d -exec chmod 775 {} +
+sudo find crm/uploads crm/backups crm/tmp crm/cache crm/log -type f -exec chmod 664 {} +</code></pre>
+          <p class="notes">Run if Rukovoditel reports “folder not writable” warnings.</p>
+        </article>
+        <article>
+          <h3>Backup project to storage disk</h3>
+          <pre><code>rsync -a --delete /mnt/sdc4/mechanicsaintaugustine.com/ /mnt/sdc4/backups/mechanicstaugustine.com_latest/</code></pre>
+          <p class="notes">Copies the entire project into the backup directory on the large drive.</p>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>Voice &amp; SMS Checklist</h2>
+      <ul class="links">
+        <li>
+          <strong>A2P Campaign</strong>
+          <span>Ensure the Twilio campaign is Approved with five sample messages and CTA screenshot.</span>
+        </li>
+        <li>
+          <strong>Attach Sender to Messaging Service</strong>
+          <span>Console → Messaging Services → <code>Sole Proprietor A2P</code> → Senders → add <code>+1 904-834-9227</code>.</span>
+        </li>
+        <li>
+          <strong>Send via MessagingServiceSid</strong>
+          <span>Use <code>MessagingServiceSid=MG436fdf28d58037bd14cc9a2e4f0b25e1</code> in API calls rather than a raw <code>From=</code>.</span>
+        </li>
+        <li>
+          <strong>Incoming Webhook URL</strong>
+          <span>Set Messaging Service → Integration → Incoming Messages to <code>https://mechanicstaugustine.com/api/sms/incoming.php</code> with HTTP POST.</span>
+        </li>
+        <li>
+          <strong>Status Callback URL</strong>
+          <span>Set Delivery Status Callback to <code>https://mechanicstaugustine.com/api/sms/status_callback.php</code> to log delivered/failed events.</span>
+        </li>
+        <li>
+          <strong>Monitor voice.log</strong>
+          <span><code>tail -f /mnt/sdc4/mechanicsaintaugustine.com/site/voice/voice.log</code> to watch live webhook activity.</span>
+        </li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Configuration Reminders</h2>
+      <div class="commands">
+        <article>
+          <h3>Update platform endpoint for PHP</h3>
+          <pre><code>File: site/api/.env.local.php
+PLATFORM_API_URL = 'https://mechanicstaugustine.com'  # or internal IP
+PLATFORM_PUBLIC_QUOTE_ENDPOINT = PLATFORM_API_URL . '/public/quote-intake'</code></pre>
+        </article>
+        <article>
+          <h3>Restart services (example)</h3>
+          <pre><code>sudo systemctl restart caddy
+sudo systemctl restart go-platform.service   # if a systemd unit exists</code></pre>
+          <p class="notes">Replace service names with the actual units deployed on the server.</p>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    Need something else? Keep notes here as workflows evolve. Edit <code>site/admin/index.html</code> in Git to update this dashboard.
+  </footer>
+</body>
+</html>

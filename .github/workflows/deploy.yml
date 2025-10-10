@@ -22,25 +22,27 @@ jobs:
         run: |
           echo "Running install (uses npm ci if lockfile exists, otherwise npm install)"
           if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
-            npm ci
+            npm ci --no-progress
           else
-            npm install
+            npm install --no-progress
           fi
 
-      - name: Lint
+      - name: Lint (if present)
         run: |
-          if npm run | grep -qE '^\s+lint\s'; then
+          if [ -f package.json ] && node -e "process.exit(!(require('./package.json').scripts && require('./package.json').scripts.lint))"; then
+            echo "Running npm run lint"
             npm run lint
           else
-            echo "No npm 'lint' script — skipping."
+            echo "No lint script found; skipping lint"
           fi
 
-      - name: Build
+      - name: Build (if present)
         run: |
-          if npm run | grep -qE '^\s+build\s'; then
+          if [ -f package.json ] && node -e "process.exit(!(require('./package.json').scripts && require('./package.json').scripts.build))"; then
+            echo "Running npm run build"
             npm run build
           else
-            echo "No npm 'build' script — skipping."
+            echo "No build script found; skipping build"
           fi
 
       - name: Deploy to Netlify

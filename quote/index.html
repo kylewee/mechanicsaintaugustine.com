@@ -23,6 +23,24 @@
       <input name="make" type="text" placeholder="Make" required />
       <input name="model" type="text" placeholder="Model" required />
       <input name="engine" type="text" placeholder="Engine Size" required />
+      <input name="street" type="text" placeholder="Street Address" required />
+      <input name="city" type="text" placeholder="City" required />
+      <input name="state" type="text" placeholder="State" maxlength="2" required />
+      <input name="zip" type="text" placeholder="ZIP Code" required />
+      <label for="service_location">Service Location</label>
+      <select id="service_location" name="service_location" required>
+        <option value="">Select Location</option>
+        <option value="home">Home</option>
+        <option value="work">Work</option>
+        <option value="roadside">Roadside</option>
+      </select>
+      <label for="vehicle_class">Vehicle Duty Class</label>
+      <select id="vehicle_class" name="vehicle_class" required>
+        <option value="">Select Class</option>
+        <option value="light">Light Duty / Passenger Vehicle</option>
+        <option value="medium">Medium Duty Fleet</option>
+        <option value="heavy">Heavy Duty / Long Haul</option>
+      </select>
       <label for="repair">Repair Type</label>
       <select id="repair" name="repair" required>
         <option value="">Select Repair</option>
@@ -34,7 +52,11 @@
         <option>Timing Belt</option>
         <option>AC Recharge</option>
         <option>Check Engine</option>
+        <option>Heater Hose Replacement</option>
       </select>
+      <label for="preferred_slot">Preferred Date & Time</label>
+      <input id="preferred_slot" name="preferred_slot" type="datetime-local" />
+      <textarea name="concern" placeholder="Describe the issue" rows="3"></textarea>
       <label style="display: flex; align-items: center; gap: 8px; font-size: 0.95rem;">
         <input type="checkbox" id="text_opt_in" name="text_opt_in" value="1" style="width:auto;" />
         Text me my estimate (one-time SMS)
@@ -57,6 +79,7 @@
       'Timing Belt': 500,
       'AC Recharge': 180,
       'Check Engine': 80,
+      'Heater Hose Replacement': 220,
     };
 
     document.getElementById('quoteForm').addEventListener('submit', async (e) => {
@@ -64,6 +87,17 @@
       const form = new FormData(e.target);
       const payload = Object.fromEntries(form.entries());
       payload.text_opt_in = document.getElementById('text_opt_in').checked;
+      const preferredSlotRaw = form.get('preferred_slot');
+      if (preferredSlotRaw) {
+        const parsed = new Date(preferredSlotRaw);
+        if (!Number.isNaN(parsed.getTime())) {
+          payload.preferred_slot = parsed.toISOString();
+        } else {
+          delete payload.preferred_slot;
+        }
+      } else {
+        delete payload.preferred_slot;
+      }
       document.getElementById('result').textContent = 'Submitting...';
       try {
         const resp = await fetch('quote_intake_handler.php', {

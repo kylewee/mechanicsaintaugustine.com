@@ -11,6 +11,155 @@ if (is_file($envFile)) {
     require $envFile;
 }
 
+// Helper functions for CRM DB fallback
+function crm_db_config(): ?array {
+  $file = __DIR__ . '/../crm/config/database.php';
+  if (!is_file($file)) return null;
+  require_once $file;
+  
+  if (defined('DB_SERVER') && defined('DB_SERVER_USERNAME') && defined('DB_DATABASE')) {
+    return [
+      'db_host' => (string)DB_SERVER,
+      'db_username' => (string)DB_SERVER_USERNAME,
+      'db_password' => (string)(defined('DB_SERVER_PASSWORD') ? DB_SERVER_PASSWORD : ''),
+      'db_name' => (string)DB_DATABASE,
+    ];
+  }
+  
+  if (defined('DB_HOST') && defined('DB_USERNAME') && defined('DB_NAME')) {
+    return [
+      'db_host' => (string)DB_HOST,
+      'db_username' => (string)DB_USERNAME, 
+      'db_password' => (string)(defined('DB_PASSWORD') ? DB_PASSWORD : ''),
+      'db_name' => (string)DB_NAME,
+    ];
+  }
+  
+  return null;
+}
+
+function resolve_field_map(): array {
+  $map = [];
+  if (defined('CRM_FIELD_MAP') && is_array(CRM_FIELD_MAP)) {
+    $map = CRM_FIELD_MAP;
+  }
+  return $map;
+}
+
+function create_crm_lead_db_insert(array $leadData): array {
+  if (!defined('CRM_LEADS_ENTITY_ID') || (int)CRM_LEADS_ENTITY_ID <= 0) {
+    return ['ok'=>false,'error'=>'leads_entity_id_missing'];
+  }
+
+  try {
+    $cfg = crm_db_config();
+    if (!$cfg) {
+      return ['ok'=>false,'error'=>'db_config_missing'];
+    }
+
+    $mysqli = @new mysqli($cfg['db_host'], $cfg['db_username'], $cfg['db_password'], $cfg['db_name']);
+    if ($mysqli->connect_errno) {
+      return ['ok'=>false,'error'=>'db_connect','detail'=>$mysqli->connect_error];
+    }
+
+    $entityId = (int)CRM_LEADS_ENTITY_ID;
+    $table = 'app_entity_' . $entityId;
+
+    $columns = [];
+    $values  = [];
+    $types   = '';
+    $seenCols = [];
+
+    // Base columns
+    $createdBy = defined('CRM_CREATED_BY_USER_ID') ? (int)CRM_CREATED_BY_USER_ID : 1;
+    $dateAdded = time();
+    foreach ([
+      'created_by'     => $createdBy,
+      'date_added'     => $dateAdded,
+      'parent_item_id' => 0,
+      'sort_order'     => 0,
+    ] as $col => $val) {
+      $columns[] = "`$col`";
+      $values[]  = $val;
+      $types    .= 'i';
+      $seenCols[$col] = true;
+    }
+
+    // Synthesize name if missing
+    if (empty($leadData['name'])) {
+      $fn = trim((string)($leadData['first_name'] ?? ''));
+      $ln = trim((string)($leadData['last_name'] ?? ''));
+      if ($fn || $ln) $leadData['name'] = trim($fn . ' ' . $ln);
+    }
+
+    // Map fields
+    $fieldMap = resolve_field_map();
+    if (is_array($fieldMap)) {
+      foreach ($fieldMap as $key => $fid) {
+        $fid = (int)$fid;
+        if ($fid <= 0 || !array_key_exists($key, $leadData)) continue;
+        $val = (string)$leadData[$key];
+        if ($key === 'phone') {
+          $val = preg_replace('/[^\d\+]/', '', $val);
+        }
+        if ($val === '') continue;
+        $col = 'field_' . $fid;
+        if (isset($seenCols[$col])) continue;
+        $seenCols[$col] = true;
+        $columns[] = '`' . $col . '`';
+        $values[]  = $val;
+        $types    .= 's';
+      }
+    }
+
+    // Handle non-nullable columns without defaults
+    $colInfo = $mysqli->query('SHOW COLUMNS FROM `' . $mysqli->real_escape_string($table) . '`');
+    if ($colInfo) {
+      while ($col = $colInfo->fetch_assoc()) {
+        $cname = $col['Field'] ?? '';
+        if (strpos($cname, 'field_') !== 0) continue;
+        if (isset($seenCols[$cname])) continue;
+        $nullable = strtolower((string)($col['Null'] ?? ''));
+        $default  = $col['Default'] ?? null;
+        if ($nullable === 'no' && $default === null) {
+          $ctype = strtolower((string)($col['Type'] ?? ''));
+          $isNumeric = (strpos($ctype, 'int') !== false) || (strpos($ctype, 'decimal') !== false);
+          $fallbackVal = $isNumeric ? 0 : '';
+          $columns[] = '`' . $cname . '`';
+          $values[]  = $fallbackVal;
+          $types    .= $isNumeric ? 'i' : 's';
+          $seenCols[$cname] = true;
+        }
+      }
+      $colInfo->close();
+    }
+
+    $placeholders = implode(',', array_fill(0, count($values), '?'));
+    $sql = 'INSERT INTO `' . $mysqli->real_escape_string($table) . '` (' . implode(',', $columns) . ') VALUES (' . $placeholders . ')';
+    $stmt = $mysqli->prepare($sql);
+    if (!$stmt) {
+      $err = $mysqli->error;
+      $mysqli->close();
+      return ['ok'=>false,'error'=>'prepare','detail'=>$err];
+    }
+
+    $stmt->bind_param($types, ...$values);
+    if (!$stmt->execute()) {
+      $err = $stmt->error;
+      $stmt->close();
+      $mysqli->close();
+      return ['ok'=>false,'error'=>'execute','detail'=>$err];
+    }
+
+    $id = $stmt->insert_id;
+    $stmt->close();
+    $mysqli->close();
+    return ['ok'=>true,'id'=>$id];
+  } catch (Throwable $e) {
+    return ['ok'=>false,'error'=>'exception','detail'=>$e->getMessage()];
+  }
+}
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
     echo json_encode(['error' => 'Method not allowed']);
@@ -143,7 +292,7 @@ if (
 
         // Prepare POST
         $post = [
-            'action'    => 'add_item',
+            'action'    => 'insert',
             'entity_id' => (int)CRM_LEADS_ENTITY_ID,
         ];
 
@@ -180,8 +329,17 @@ if (
         }
 
         // Attach fields
+        $itemPayload = [];
         foreach ($fieldValues as $fid => $val) {
-            $post['fields[field_' . (int)$fid . ']'] = $val;
+            $itemPayload['field_' . (int)$fid] = $val;
+        }
+        if (defined('CRM_CREATED_BY_USER_ID')) {
+            $itemPayload['created_by'] = (int)CRM_CREATED_BY_USER_ID;
+        }
+        if (!empty($itemPayload)) {
+            foreach ($itemPayload as $fieldKey => $value) {
+                $post["items[0][$fieldKey]"] = $value;
+            }
         }
 
         if (!isset($crm_result['error'])) {
@@ -198,12 +356,96 @@ if (
             $err2  = curl_error($ch2);
             $http2 = (int)curl_getinfo($ch2, CURLINFO_HTTP_CODE);
             curl_close($ch2);
+            
+            $apiJson = $resp2 ? json_decode($resp2, true) : null;
             $crm_result = [ 'http' => $http2, 'curl_errno' => $errno2, 'curl_error' => $err2, 'body' => $resp2 ];
+            
+            // Check if we should fallback to direct DB insert
+            $shouldFallback = ($errno2 !== 0) || ($http2 >= 500) || ($resp2 === false);
+            if (!$shouldFallback) {
+                if (!is_array($apiJson)) {
+                    $shouldFallback = true;
+                } elseif (isset($apiJson['status']) && strtolower((string)$apiJson['status']) !== 'success') {
+                    $shouldFallback = true;
+                    $crm_result['api_error'] = $apiJson;
+                }
+            }
+            
+            // Fallback to direct DB insert if API failed
+            if ($shouldFallback) {
+                $dbRes = create_crm_lead_db_insert([
+                    'first_name' => $first,
+                    'last_name' => $last ?: $first,
+                    'name' => $name,
+                    'phone' => $data['phone'] ?? '',
+                    'email' => $data['email'] ?? '',
+                    'year' => $data['year'] ?? '',
+                    'make' => $data['make'] ?? '',
+                    'model' => $data['model'] ?? '',
+                    'engine' => $data['engine'] ?? '',
+                    'notes' => 'Quote via website' . "\n" .
+                               'Repair: ' . ($data['repair'] ?? '') . "\n" .
+                               'Estimate: ' . (is_array($estimate_result) ? json_encode($estimate_result) : ''),
+                ]);
+                $crm_result['fallback'] = $dbRes;
+            }
         }
     }
 }
 
-// Build response
+// Send SMS if opted in
+$sms_result = null;
+$text_opt_in = !empty($data['text_opt_in']);
+if ($text_opt_in && $estimate_result) {
+    $twilio_sid = 'REDACTED_TWILIO_SID';
+    $twilio_token = getenv('TWILIO_AUTH_TOKEN') ?: '';
+    $twilio_from = 'REDACTED_TWILIO_FROM';
+    
+    if ($twilio_token) {
+        // Format estimate message
+        $est_low = $estimate_result['total_low'] ?? 0;
+        $est_high = $estimate_result['total_high'] ?? 0;
+        $message = "Hi {$data['name']}, your {$data['repair']} estimate: $" . number_format($est_low, 2) . " - $" . number_format($est_high, 2) . ". We'll call shortly! - Mechanic St Augustine";
+        
+        // Ensure phone has +1 prefix
+        $phone = $data['phone'];
+        if (!str_starts_with($phone, '+')) {
+            $phone = '+1' . preg_replace('/[^0-9]/', '', $phone);
+        }
+        
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, "https://api.twilio.com/2010-04-01/Accounts/{$twilio_sid}/Messages.json");
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
+            'From' => $twilio_from,
+            'To' => $phone,
+            'Body' => $message
+        ]));
+        curl_setopt($ch, CURLOPT_USERPWD, "{$twilio_sid}:{$twilio_token}");
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+        
+        $sms_response = curl_exec($ch);
+        $sms_http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curl_error = curl_error($ch);
+        curl_close($ch);
+        
+        if ($sms_http_code === 201) {
+            $sms_result = ['status' => 'sent'];
+        } else {
+            $sms_result = [
+                'status' => 'error', 
+                'reason' => 'twilio_http_' . $sms_http_code,
+                'curl_error' => $curl_error,
+                'response' => substr($sms_response, 0, 200)
+            ];
+        }
+    } else {
+        $sms_result = ['status' => 'error', 'reason' => 'twilio_config_missing'];
+    }
+}
+
+// Build response with estimate.amount for frontend
 $response = [
     'success' => true,
     'message' => 'Quote request received',
@@ -211,6 +453,7 @@ $response = [
         'name' => $data['name'],
         'phone' => $data['phone'],
         'email' => $data['email'] ?? '',
+        'text_opt_in' => $text_opt_in,
         'vehicle' => [
             'year' => $data['year'] ?? '',
             'make' => $data['make'] ?? '',
@@ -218,7 +461,9 @@ $response = [
             'engine' => $data['engine'] ?? ''
         ],
         'repair' => $data['repair'] ?? '',
-        'estimate' => $estimate_result,
+        'estimate' => $estimate_result ? ['amount' => round(($estimate_result['total_low'] + $estimate_result['total_high']) / 2, 2)] : null,
+        'estimate_raw' => $estimate_result,
+        'sms' => $sms_result,
         'crm' => $crm_result
     ]
 ];

@@ -1,0 +1,24 @@
+{
+    email sodjacksonville@gmail.com
+    admin off
+}
+
+mechanicstaugustine.com, www.mechanicstaugustine.com {
+    root * /home/kylewee/mechanicsaintaugustine.com/site
+    
+    # PHP processing
+    php_fastcgi unix//run/php/php8.3-fpm.sock
+    
+    # Serve static files
+    file_server
+}
+
+localhost:8092 {
+    root * /home/kylewee/mechanicsaintaugustine.com/site
+    
+    # PHP processing
+    php_fastcgi unix//run/php/php8.3-fpm.sock
+    
+    # Serve static files
+    file_server
+}

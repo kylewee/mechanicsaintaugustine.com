@@ -1,0 +1,5 @@
+DROP TABLE IF EXISTS quote_line_items;
+DROP TABLE IF EXISTS quotes;
+DROP TABLE IF EXISTS vehicles;
+DROP TABLE IF EXISTS customers;
+DROP TABLE IF EXISTS users;
