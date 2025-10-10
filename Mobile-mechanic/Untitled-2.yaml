@@ -1,0 +1,97 @@
+name: CI / Lint / Build / Deploy
+
+on:
+  push:
+    branches: [ main, staging-ci ]
+  pull_request:
+    branches: [ main, staging-ci ]
+
+jobs:
+  lint_build_deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
+    env:
+      # If your app lives in a subfolder, set PACKAGE_DIR to that relative path (e.g. "crm/js/my-app")
+      PACKAGE_DIR: ""
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'npm'
+
+      - name: Show git info
+        run: |
+          echo "Branch: $GITHUB_REF"
+          git --version
+          node --version
+          npm --version
+
+      - name: Change to package dir (if set)
+        run: |
+          if [ -n "${{ env.PACKAGE_DIR }}" ]; then
+            echo "Switching to subfolder: ${{ env.PACKAGE_DIR }}"
+            cd ${{ env.PACKAGE_DIR }} || (echo "Subfolder not found" && exit 1)
+          else
+            echo "Using repo root"
+          fi
+        shell: bash
+
+      - name: Install dependencies (ci if lockfile exists)
+        run: |
+          # if the workflow was switched into a subfolder, current dir is correct
+          echo "Current dir: $(pwd)"
+          if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
+            echo "Lockfile found -> npm ci"
+            npm ci --silent
+          else
+            echo "No lockfile -> npm install"
+            npm install --silent
+          fi
+
+      - name: Run lint (if present)
+        run: |
+          # npm supports "--if-present" to skip if script missing
+          npm run lint --if-present
+
+      - name: Run tests (if present)
+        run: |
+          npm test --if-present
+
+      - name: Build (if present)
+        run: |
+          npm run build --if-present
+
+      # ---------- Optional: deploy to Netlify ----------
+      # To enable set repository secret NETLIFY_AUTH_TOKEN and NETLIFY_SITE_ID
+      - name: Deploy to Netlify (optional)
+        if: ${{ secrets.NETLIFY_AUTH_TOKEN && secrets.NETLIFY_SITE_ID }}
+        run: |
+          # install Netlify CLI and deploy -- change --dir if your build output folder differs
+          npm i -g netlify-cli
+          # use --prod for production; for preview remove --prod or use --dir for preview folder
+          netlify deploy --dir=./build --site="${NETLIFY_SITE_ID}" --auth="${NETLIFY_AUTH_TOKEN}" --prod
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+
+      # ---------- Optional: deploy to Vercel ----------
+      # To enable set repository secret VERCEL_TOKEN (and optionally VERCEL_ORG_ID / VERCEL_PROJECT_ID)
+      - name: Deploy to Vercel (optional)
+        if: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          npm i -g vercel
+          # the --prod flag does a production deploy; you can use "vercel --confirm --token $VERCEL_TOKEN" for previews
+          vercel --prod --token="$VERCEL_TOKEN"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}

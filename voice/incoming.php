@@ -10,9 +10,17 @@ if (is_file($env)) {
 
 $host = $_SERVER['HTTP_HOST'] ?? 'mechanicstaugustine.com';
 $callback = 'https://' . $host . '/voice/recording_callback.php';
-// Force personal phone for testing - config not loading properly
-$to = '+19046634789';
-$to = preg_replace('/[^0-9\+]/', '', $to);
+$toRaw = defined('TWILIO_FORWARD_TO') ? TWILIO_FORWARD_TO : '+19046634789';
+$to = preg_replace('/[^0-9\+]/', '', (string)$toRaw);
+if ($to === '') {
+  $to = '+19046634789';
+}
+// Caller ID must be a verified Twilio number
+$callerIdRaw = defined('TWILIO_SMS_FROM') ? TWILIO_SMS_FROM : '';
+$callerId = preg_replace('/[^0-9\+]/', '', (string)$callerIdRaw);
+if ($callerId === '') {
+  $callerId = $to;
+}
 
 // Log webhook hit and dial target for diagnostics
 try {
@@ -40,7 +48,7 @@ echo '<?xml version="1.0" encoding="UTF-8"?>';
         recordingTrack="both"
         timeLimit="14400"
         answerOnBridge="true"
-        callerId="REDACTED_TWILIO_FROM"
+        callerId="<?=htmlspecialchars($callerId, ENT_QUOTES)?>"
     action="<?=htmlspecialchars('https://' . $host . '/voice/recording_callback.php?action=dial', ENT_QUOTES)?>"
         method="POST"
         recordingStatusCallback="<?=htmlspecialchars($callback, ENT_QUOTES)?>"

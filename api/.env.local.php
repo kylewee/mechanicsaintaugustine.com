@@ -1,12 +1,12 @@
 <?php
 
 // Twilio Configuration for Voice System  
-const TWILIO_FORWARD_TO = '+19046634789';  // Your personal phone
-const TWILIO_ACCOUNT_SID = 'your_twilio_sid_here';  // Your Twilio Account SID from environment
-const TWILIO_AUTH_TOKEN = 'REDACTED_TWILIO_TOKEN';
-const TWILIO_SMS_FROM = 'REDACTED_TWILIO_FROM';
+define('TWILIO_FORWARD_TO', getenv('TWILIO_FORWARD_TO') ?: '+19046634789');  // Your personal phone as fallback
+define('TWILIO_ACCOUNT_SID', getenv('TWILIO_ACCOUNT_SID') ?: '');
+define('TWILIO_AUTH_TOKEN', getenv('TWILIO_AUTH_TOKEN') ?: '');
+define('TWILIO_SMS_FROM', getenv('TWILIO_SMS_FROM') ?: '');
 const CRM_API_URL = 'https://mechanicstaugustine.com/crm/api/rest.php';
-const CRM_API_KEY = 'REDACTED_CRM_API_KEY';
+define('CRM_API_KEY', getenv('CRM_API_KEY') ?: '');
 
 // Notification settings for quote intake
 const QUOTE_NOTIFICATION_EMAILS = ['sodjacksonville@gmail.com'];
@@ -24,7 +24,7 @@ const STATUS_CALLBACK_EMAIL_FROM = '';
 // Set to your actual Leads Entity ID
 const CRM_LEADS_ENTITY_ID = 26;
 const CRM_USERNAME = 'kylewee2'; 
-const CRM_PASSWORD = 'REDACTED_CRM_PASSWORD';
+define('CRM_PASSWORD', getenv('CRM_PASSWORD') ?: '');
 // Minimal mapping to get Leads created now with First/Last split.
 // We also map 'name' to First Name as a fallback so it "just works".
 const CRM_FIELD_MAP = [
@@ -44,7 +44,7 @@ const CRM_FIELD_MAP = [
 define('CRM_CREATED_BY_USER_ID', 1); // change to kylewee2's user ID when known
 
 // OpenAI configuration (for Whisper transcription and AI extraction)
-const OPENAI_API_KEY = 'REDACTED_OPENAI_KEY';
+define('OPENAI_API_KEY', getenv('OPENAI_API_KEY') ?: '');
 
 // Optional: Secure the recordings page with a tokenized link. Leave empty to disable.
 // Example usage: https://mechanicstaugustine.com/voice/recording_callback.php?action=recordings&token=YOUR_TOKEN

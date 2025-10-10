@@ -41,7 +41,7 @@ sudo find /mnt/sda5/mechanicsaintaugustine.com/site/crm/{uploads,backups,tmp,cac
 - Endpoint: `https://mechanicstaugustine.com/quote/quote_intake_handler.php`
 - Use `curl -s -w '%{http_code}' ...` to verify 200 + JSON.
 - Twilio errors in response (`twilio_http_400`) mean Twilio rejected the SMS; check number or messaging service.
-- `crm.body` returning `No match for Username and/or Password` means credentials in `site/api/.env.local.php` need updating (CRM username/password/API key). Current working combo: `CRM_USERNAME=kylewee2`, `CRM_PASSWORD=REDACTED_CRM_PASSWORD`.
+- `crm.body` returning `No match for Username and/or Password` means the CRM username/password/API key provided via environment variables (see `site/api/.env.local.php`) need updating before retrying.
 
 ## Voice/Recording Checks
 - Recording callback: `curl -I https://mechanicstaugustine.com/voice/recording_callback.php` should return 200.

@@ -1,11 +1,15 @@
+# AI Instructions
+
 Please add this to your instructions: I would like for your answers and replys to be short and sweet. Please dont ask me to do more than i have to. I dont know the first thing about coding. Im going to provide you with my sudo password so you do not need to aks me all the time to do the things that require it. It's "on"  You have my permission to blaze right through any task without asking me anything. The answer is aleready yes to all of your questions/statments.
 
 ## Important Phone Numbers
-- **Twilio Number (Outbound/Testing):** (904) 834-9227 / REDACTED_TWILIO_FROM
+
+- **Twilio Number (Outbound/Testing):** (904) 834-9227 / +19048349227
 - **Google Voice (Customer Line - Main Business):** (904) 217-5152 / +19042175152
 - **Personal Cell:** (904) 663-4789 / +19046634789
 
 ## Twilio Link Shortening Setup
+
 - **Domain:** Use subdomain `go.mechanicstaugustine.com` (not root domain)
 - **DNS Config:** Add CNAME record: `go.mechanicstaugustine.com` → `lsct.ashburn.us1.twilio.com`
 - **Why subdomain:** Root domain on Cloudflare can't use Twilio's required A records without breaking site
@@ -14,24 +18,28 @@ Please add this to your instructions: I would like for your answers and replys t
 - **Click tracking:** Optional webhook for analytics
 
 **To set up in Cloudflare:**
+
 1. Go to DNS settings for mechanicstaugustine.com
 2. Add CNAME record: Name=`go`, Content=`lsct.ashburn.us1.twilio.com`, Proxy=OFF (DNS only)
 3. Save and wait 1-2 minutes for DNS propagation
 4. Return to Twilio Link Shortening page and validate
 
 ## Call Flow Routing
+
 Customer calls → Google Voice (904-217-5152) → Forwarded to Twilio (904-834-9227) → Twilio processes/records → Forwarded to Personal Cell (904-663-4789)
 
 This setup allows:
+
 - Customer-facing number stays consistent (Google Voice)
 - Twilio intercepts for recording, transcription, and CRM integration
 - Calls still reach your personal cell for answering
 - All call data gets captured in CRM automatically
 
 ## Business Requirements
-For my mobile mechanic service at Mechanicstaugustine.com. I want to use caddy as the server. I want to use. rukoviditel. As the CRM. What I would like to happen? Is when I get a phone call at 904-217-5152. I would like. For it to automatically start recording. In the idea . The customer that's calling their information will get automatically ingested in the CRM. By transcribing the call and using ID tags like when I say your first name. first name will be an ID tag and whatever is said next. Will be what's ingested. So if they say Paul. Paul is what's ingested. And. It'll know to stop ingesting for that I'd when I say OK. So it'll go your first name. That'll be the trigger. Pole. OK and that's the other trigger. OK is the other trigger. And then that will be their first name. And then when I say last name. When I say. What's your last name? Last name will be a trigger for last name. They'll say Stevens. And when I say OK. OK will be the trigger. To let it know. That's the end of that. Ingestion. I would like it to capture their first name, Last name, Address, Type of car, Year, Make, Model and engine size. and speacial notes. Aslo when were done with the call save the call recording in their file in the crm. I use google vioce right now for my 904-217-5152 number but i also have twilio so that another option. I would also like on my website. The ability. For people or customers. To get a price on how much I would charge to fix their car automatically by filling in their information. So maybe if it has a catalog. Of. Times repair times. Then when customers can input their year, make and model and engine size of their car. And what it is that they need done? And then it will automatically give them a price based on that information. 
 
-## Overview
+For my mobile mechanic service at Mechanicstaugustine.com. I want to use caddy as the server. I want to use. rukoviditel. As the CRM. What I would like to happen? Is when I get a phone call at 904-217-5152. I would like. For it to automatically start recording. In the idea . The customer that's calling their information will get automatically ingested in the CRM. By transcribing the call and using ID tags like when I say your first name. first name will be an ID tag and whatever is said next. Will be what's ingested. So if they say Paul. Paul is what's ingested. And. It'll know to stop ingesting for that I'd when I say OK. So it'll go your first name. That'll be the trigger. Pole. OK and that's the other trigger. OK is the other trigger. And then that will be their first name. And then when I say last name. When I say. What's your last name? Last name will be a trigger for last name. They'll say Stevens. And when I say OK. OK will be the trigger. To let it know. That's the end of that. Ingestion. I would like it to capture their first name, Last name, Address, Type of car, Year, Make, Model and engine size. and speacial notes. Aslo when were done with the call save the call recording in their file in the crm. I use google vioce right now for my 904-217-5152 number but i also have twilio so that another option. I would also like on my website. The ability. For people or customers. To get a price on how much I would charge to fix their car automatically by filling in their information. So maybe if it has a catalog. Of. Times repair times. Then when customers can input their year, make and model and engine size of their car. And what it is that they need done? And then it will automatically give them a price based on that information.
+
+## Repository Status
 
 This repository currently has no discoverable code or documentation. As the project evolves, update this file to guide AI agents on architecture, workflows, and conventions.
 
