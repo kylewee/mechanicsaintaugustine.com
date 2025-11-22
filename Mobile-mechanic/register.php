@@ -169,38 +169,69 @@ $("#customerreg").click(function(e){
 
 include "connection.php";
 if (isset($_POST['submit'])) {
-  $cname = $_POST['cname'];
+  // Sanitize and validate inputs
+  $cname = trim($_POST['cname']);
   $gender = $_POST['gender'];
-  $email = $_POST['cemail'];
+  $email = filter_var($_POST['cemail'], FILTER_SANITIZE_EMAIL);
   $password = $_POST['cpass'];
   $cpassword = $_POST['cconfirmpass'];
-  $phone = $_POST['cphone'];
-  $city = $_POST['ccity'];
-  $pincode = $_POST['pincode'];
-  $emergencycontact = $_POST['cecontact'];
+  $phone = preg_replace('/[^0-9+\-\s()]/', '', $_POST['cphone']);
+  $city = trim($_POST['ccity']);
+  $pincode = preg_replace('/[^0-9]/', '', $_POST['pincode']);
+  $emergencycontact = trim($_POST['cecontact']);
 
-
-  $sql = "INSERT INTO  `mm`.`customer_reg` (`cid` ,`cname` ,`gender` ,`cemail` ,`cpassword` ,`cphone` ,`ccity` ,`pincode` ,`emergencycontact`)VALUES (NULL,  '$cname',  '$gender',  '$email',  MD5('" . $password . "'),  '$phone',  '$city',  '$pincode',  '$emergencycontact');";
-  $echo = '<div class="alert alert-success"><strong> congrats registeration successful </strong> </div>';
-  $status = mysqli_query($conn, $sql);
-  if ($status > 0) {
+  // Validate email
+  if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
     ?>
+    <script type="text/javascript">
+      alert("Invalid email format");
+    </script>
+    <?php
+  } elseif ($password !== $cpassword) {
+    // Check if passwords match
+    ?>
+    <script type="text/javascript">
+      alert("Passwords do not match");
+    </script>
+    <?php
+  } elseif (strlen($password) < 8) {
+    // Minimum password length
+    ?>
+    <script type="text/javascript">
+      alert("Password must be at least 8 characters long");
+    </script>
+    <?php
+  } else {
+    // FIXED: Use prepared statement to prevent SQL injection
+    // FIXED: Use password_hash instead of MD5 for secure password hashing
+    $hashed_password = password_hash($password, PASSWORD_DEFAULT);
 
-<script type="text/javascript">
-  
-  window.location="index.php";
-  alert("Registration Successful");
+    $stmt = $conn->prepare("INSERT INTO customer_reg (cname, gender, cemail, cpassword, cphone, ccity, pincode, emergencycontact) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+    $stmt->bind_param("ssssssss", $cname, $gender, $email, $hashed_password, $phone, $city, $pincode, $emergencycontact);
 
-</script>
-  <?php
-
-} else {
-  ?>
-	<script type="text/javascript">
- alert("Registration not done");
-</script>
-<?php
-
-}
-
+    if ($stmt->execute()) {
+      ?>
+      <script type="text/javascript">
+        window.location="index.php";
+        alert("Registration Successful");
+      </script>
+      <?php
+    } else {
+      // Check for duplicate email
+      if ($conn->errno === 1062) {
+        ?>
+        <script type="text/javascript">
+          alert("Email already registered");
+        </script>
+        <?php
+      } else {
+        ?>
+        <script type="text/javascript">
+          alert("Registration failed. Please try again.");
+        </script>
+        <?php
+      }
+    }
+    $stmt->close();
+  }
 }

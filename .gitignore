@@ -7,7 +7,12 @@ dist/
 
 # Environment and configuration
 .env
+.env.local
+.env.*.local
+.env.production
+.env.staging
 config.local.php
+*.env
 
 # IDE
 .vscode/
@@ -16,6 +21,9 @@ config.local.php
 backups/
 *.tar.gz
 *.backup
+*.backup-*
+*.bak
+*.deprecated
 
 # Ignore temporary files
 tmp/
@@ -26,4 +34,3 @@ temp/
 *.log
 api/quote_intake.log
 api/sms_incoming.log
-<file>

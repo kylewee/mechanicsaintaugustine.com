@@ -20,54 +20,113 @@ if (isset($_SESSION['cemail']) || isset($_SESSION['memail'])) {
 $error = "";
 
 if (isset($_POST['submit'])) {
-    $email = $_POST['email'];
-    $password = md5($_POST['password']);
+    // Sanitize inputs
+    $email = filter_var($_POST['email'], FILTER_SANITIZE_EMAIL);
+    $password = $_POST['password'];
     $ltype = $_POST['ltype'];
 
-    if ($ltype == 'c') {
-        // Customer login
-        $result = mysqli_query($conn, "SELECT * FROM customer_reg WHERE cemail='$email' AND cpassword='$password'");
-        $count = mysqli_num_rows($result);
-        $data = mysqli_fetch_array($result);
-        
-        if ($count > 0) {
-            $_SESSION["ltype"] = $ltype;
-            $_SESSION["cemail"] = $data[3];
-            $_SESSION["cname"] = $data[1];
-            header("Location: cprofile.php");
-            exit();
-        } else {
-            $error = "Invalid Customer Email/Password";
-        }
-    } elseif ($ltype == 'a') {
-        // Admin login - note the column name is 'aemail' not 'email'
-        $result = mysqli_query($conn, "SELECT * FROM admin WHERE aemail='$email' AND password='$password'");
-        $count = mysqli_num_rows($result);
-        $data = mysqli_fetch_array($result);
-        
-        if ($count > 0) {
-            $_SESSION["ltype"] = $ltype;
-            $_SESSION["cemail"] = $data[0];
-            $_SESSION["cname"] = "admin";
-            header("Location: admin.php");
-            exit();
-        } else {
-            $error = "Invalid Admin Email/Password";
-        }
+    // Validate email format
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $error = "Invalid email format";
     } else {
-        // Mechanic login
-        $result = mysqli_query($conn, "SELECT * FROM mechanic_reg WHERE memail='$email' AND mpassword='$password'");
-        $count = mysqli_num_rows($result);
-        $data = mysqli_fetch_array($result);
-        
-        if ($count > 0) {
-            $_SESSION["ltype"] = $ltype;
-            $_SESSION["memail"] = $data[4];
-            $_SESSION["mname"] = $data[1];
-            header("Location: mprofile.php");
-            exit();
+        if ($ltype == 'c') {
+            // Customer login - FIXED: Using prepared statement to prevent SQL injection
+            $stmt = $conn->prepare("SELECT cid, cname, cgender, cemail, cpassword FROM customer_reg WHERE cemail = ?");
+            $stmt->bind_param("s", $email);
+            $stmt->execute();
+            $result = $stmt->get_result();
+
+            if ($result->num_rows > 0) {
+                $data = $result->fetch_assoc();
+                // Support both legacy MD5 and new password_hash formats
+                $password_valid = false;
+                if (strlen($data['cpassword']) === 32) {
+                    // Legacy MD5 hash
+                    $password_valid = (md5($password) === $data['cpassword']);
+                } else {
+                    // Modern password_hash
+                    $password_valid = password_verify($password, $data['cpassword']);
+                }
+
+                if ($password_valid) {
+                    $_SESSION["ltype"] = $ltype;
+                    $_SESSION["cemail"] = $data['cemail'];
+                    $_SESSION["cname"] = $data['cname'];
+                    header("Location: cprofile.php");
+                    exit();
+                } else {
+                    $error = "Invalid Customer Email/Password";
+                }
+            } else {
+                $error = "Invalid Customer Email/Password";
+            }
+            $stmt->close();
+
+        } elseif ($ltype == 'a') {
+            // Admin login - FIXED: Using prepared statement
+            $stmt = $conn->prepare("SELECT aemail, password FROM admin WHERE aemail = ?");
+            $stmt->bind_param("s", $email);
+            $stmt->execute();
+            $result = $stmt->get_result();
+
+            if ($result->num_rows > 0) {
+                $data = $result->fetch_assoc();
+                // Support both legacy MD5 and new password_hash formats
+                $password_valid = false;
+                if (strlen($data['password']) === 32) {
+                    // Legacy MD5 hash
+                    $password_valid = (md5($password) === $data['password']);
+                } else {
+                    // Modern password_hash
+                    $password_valid = password_verify($password, $data['password']);
+                }
+
+                if ($password_valid) {
+                    $_SESSION["ltype"] = $ltype;
+                    $_SESSION["cemail"] = $data['aemail'];
+                    $_SESSION["cname"] = "admin";
+                    header("Location: admin.php");
+                    exit();
+                } else {
+                    $error = "Invalid Admin Email/Password";
+                }
+            } else {
+                $error = "Invalid Admin Email/Password";
+            }
+            $stmt->close();
+
         } else {
-            $error = "Invalid Mechanic Email/Password";
+            // Mechanic login - FIXED: Using prepared statement
+            $stmt = $conn->prepare("SELECT mid, mname, mgender, mphone, memail, mpassword FROM mechanic_reg WHERE memail = ?");
+            $stmt->bind_param("s", $email);
+            $stmt->execute();
+            $result = $stmt->get_result();
+
+            if ($result->num_rows > 0) {
+                $data = $result->fetch_assoc();
+                // Support both legacy MD5 and new password_hash formats
+                $password_valid = false;
+                if (strlen($data['mpassword']) === 32) {
+                    // Legacy MD5 hash
+                    $password_valid = (md5($password) === $data['mpassword']);
+                } else {
+                    // Modern password_hash
+                    $password_valid = password_verify($password, $data['mpassword']);
+                }
+
+                if ($password_valid) {
+                    $_SESSION["ltype"] = $ltype;
+                    $_SESSION["memail"] = $data['memail'];
+                    $_SESSION["mname"] = $data['mname'];
+                    header("Location: mprofile.php");
+                    exit();
+                } else {
+                    $error = "Invalid Mechanic Email/Password";
+                }
+            } else {
+                $error = "Invalid Mechanic Email/Password";
+            }
+            $stmt->close();
         }
     }
 }
