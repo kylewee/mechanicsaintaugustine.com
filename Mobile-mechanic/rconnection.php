@@ -1,14 +1,19 @@
 <?php
-//Database configuration
+/**
+ * Rating Database Connection
+ * Uses centralized config for database credentials
+ */
 
-define('HOST', 'localhost');
-define('USERNAME', 'root');
-define('PASSWORD', '');
-define('DATABASE_NAME', 'rating');
+require_once __DIR__ . '/config.php';
 
-//Connect with the database
-$db = new mysqli(HOST, USERNAME, PASSWORD, DATABASE_NAME);
-if ($db->connect_errno) :
-    die('Connect error:' . $db->connect_error);
-endif;
+// Connect to rating database
+$db = new mysqli(RATING_DB_HOST, RATING_DB_USERNAME, RATING_DB_PASSWORD, RATING_DB_NAME);
+
+if ($db->connect_errno) {
+    error_log("Rating database connection failed: " . $db->connect_error);
+    die("Connection failed. Please try again later.");
+}
+
+// Set charset to prevent encoding issues
+$db->set_charset("utf8mb4");
 ?>

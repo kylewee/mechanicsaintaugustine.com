@@ -7,9 +7,9 @@ include('database_connection.php');
 if (isset($_POST["action"])) {
 
 	if ($_POST["action"] == "fetch_single") {
-		$query = "SELECT * FROM mechanic_reg WHERE mid = '" . $_POST["mid"] . "'";
+		$query = "SELECT * FROM mechanic_reg WHERE mid = :mid";
 		$statement = $connect->prepare($query);
-		$statement->execute();
+		$statement->execute([':mid' => $_POST["mid"]]);
 		$result = $statement->fetchAll();
 		foreach ($result as $row) {
 			$output['mname'] = $row['mname'];
@@ -22,9 +22,9 @@ if (isset($_POST["action"])) {
 	}
 
 	if ($_POST["action"] == "delete") {
-		$query = "DELETE FROM mechanic_reg WHERE mid = '" . $_POST["id"] . "'";
+		$query = "DELETE FROM mechanic_reg WHERE mid = :id";
 		$statement = $connect->prepare($query);
-		$statement->execute();
+		$statement->execute([':id' => $_POST["id"]]);
 		echo '<p>Data Deleted</p>';
 	}
 }

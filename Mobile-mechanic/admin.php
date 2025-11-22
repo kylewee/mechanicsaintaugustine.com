@@ -8,7 +8,7 @@ if (isset($_SESSION['cemail'])) {
     <head>
         <title>Admin</title>    
         <link href="styles.css" rel="stylesheet" type="text/css" media="screen" />
-		    <link href='http://fonts.googleapis.com/css?family=Voltaire' rel='stylesheet' type='text/css'>
+		    <link href='https://fonts.googleapis.com/css?family=Voltaire' rel='stylesheet' type='text/css'>
 			<style>
   button{
       background-color:#ff9933;

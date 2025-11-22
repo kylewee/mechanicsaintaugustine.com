@@ -11,7 +11,7 @@ if (isset($_SESSION['cemail'])) {
 		<script src="JS/jquery.min.js"></script>  
 		<script src="JS/jquery-ui.js"></script>
         <link href="styles.css" rel="stylesheet" type="text/css" media="screen" />
-		<link href='http://fonts.googleapis.com/css?family=Voltaire' rel='stylesheet' type='text/css'>
+		<link href='https://fonts.googleapis.com/css?family=Voltaire' rel='stylesheet' type='text/css'>
 		<style>
   button{
       background-color:#ff9933;

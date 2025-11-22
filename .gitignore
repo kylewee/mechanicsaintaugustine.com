@@ -11,6 +11,8 @@ config.local.php
 
 # IDE
 .vscode/
+*.code-workspace
+.idea/
 
 # Ignore backup files
 backups/
