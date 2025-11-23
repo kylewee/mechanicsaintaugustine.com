@@ -1,6 +1,8 @@
 # AI Instructions
 
-Please add this to your instructions: I would like for your answers and replys to be short and sweet. Please dont ask me to do more than i have to. I dont know the first thing about coding. Im going to provide you with my sudo password so you do not need to aks me all the time to do the things that require it. It's "on"  You have my permission to blaze right through any task without asking me anything. The answer is aleready yes to all of your questions/statments.
+**Communication Style:** Keep responses concise and actionable. Minimize back-and-forth questions where possible.
+
+**Security Note:** Never commit credentials or passwords to this repository. Use environment variables for all sensitive configuration.
 
 ## Important Phone Numbers
 
@@ -88,42 +90,12 @@ This workspace powers a local mechanic quoting app and a containerized Rukovodit
 - **Start Everything:**  
   `docker compose up -d --build` (from repo root)
 
-S_CRM_ENABLED=1
-WEERTS_CRM_API_URL=<https://weerts.us/crm/api/>
-WEERTS_CRM_API_KEY=15589132311506514541131001388612707157206026129691454114279
+## Caddy Server Setup
 
-Here’s how to finish HTTPS for weerts.us based on your latest outputs.
-
-Checklist
-
-- Ensure Caddy uses the main Caddyfile (not Caddyfile.http)
-- Fix Caddyfile syntax (move email to global block)
-- Fix log permissions
-- Make 443 reachable publicly (and fix IPv6 AAAA if not using IPv6)
-
-Do this
-
-- Update Caddyfile (top of file):
-  {
-    email <sodjacksonville@gmail.com>
-  }
-  Remove the line “tls …” inside weerts.us.
-- Fix log dir:
-  sudo mkdir -p /var/log/caddy
-  sudo chown -R www-data:www-data /var/log/caddy
-- Point the service at the main Caddyfile and reload:
-  sudo systemctl daemon-reload
-  sudo systemctl restart weerts-caddy
-  journalctl -u weerts-caddy -n 80 --no-pager
-- Open/forward 443 on your router to this machine. Your HTTP works; HTTPS times out, so 443 isn’t reachable from the internet.
-- If you have an AAAA record (you do), either:
-  - Open IPv6 80/443 to this host, or
-  - Temporarily remove the AAAA so ACME validates over IPv4.
-
-Validate
-
-- caddy validate --config /home/kylewee/code/weerts/Caddyfile
-- curl -I <https://weerts.us/health>
+- Main web server: Caddy (configured in `Caddyfile`)
+- Automatic HTTPS via Let's Encrypt
+- Reverse proxy for CRM and API endpoints
+- See `Caddyfile` for current configuration
 
 ## Execution Approach
 
