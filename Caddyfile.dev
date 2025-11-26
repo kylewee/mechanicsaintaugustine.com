@@ -1,0 +1,20 @@
+{
+    admin off
+    auto_https off
+}
+
+:8080 {
+    root * /home/user/mechanicsaintaugustine.com
+
+    # Enable PHP processing
+    php_fastcgi unix//run/php/php8.4-fpm.sock
+
+    # Serve static files
+    file_server
+
+    # Logging
+    log {
+        output stdout
+        format console
+    }
+}
