@@ -26,10 +26,13 @@ if (isset($_POST['submit'])) {
 
     if ($ltype == 'c') {
         // Customer login
-        $result = mysqli_query($conn, "SELECT * FROM customer_reg WHERE cemail='$email' AND cpassword='$password'");
-        $count = mysqli_num_rows($result);
-        $data = mysqli_fetch_array($result);
-        
+        $stmt = $conn->prepare("SELECT * FROM customer_reg WHERE cemail=? AND cpassword=?");
+        $stmt->bind_param("ss", $email, $password);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $count = $result->num_rows;
+        $data = $result->fetch_array();
+
         if ($count > 0) {
             $_SESSION["ltype"] = $ltype;
             $_SESSION["cemail"] = $data[3];
@@ -39,12 +42,16 @@ if (isset($_POST['submit'])) {
         } else {
             $error = "Invalid Customer Email/Password";
         }
+        $stmt->close();
     } elseif ($ltype == 'a') {
         // Admin login - note the column name is 'aemail' not 'email'
-        $result = mysqli_query($conn, "SELECT * FROM admin WHERE aemail='$email' AND password='$password'");
-        $count = mysqli_num_rows($result);
-        $data = mysqli_fetch_array($result);
-        
+        $stmt = $conn->prepare("SELECT * FROM admin WHERE aemail=? AND password=?");
+        $stmt->bind_param("ss", $email, $password);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $count = $result->num_rows;
+        $data = $result->fetch_array();
+
         if ($count > 0) {
             $_SESSION["ltype"] = $ltype;
             $_SESSION["cemail"] = $data[0];
@@ -54,12 +61,16 @@ if (isset($_POST['submit'])) {
         } else {
             $error = "Invalid Admin Email/Password";
         }
+        $stmt->close();
     } else {
         // Mechanic login
-        $result = mysqli_query($conn, "SELECT * FROM mechanic_reg WHERE memail='$email' AND mpassword='$password'");
-        $count = mysqli_num_rows($result);
-        $data = mysqli_fetch_array($result);
-        
+        $stmt = $conn->prepare("SELECT * FROM mechanic_reg WHERE memail=? AND mpassword=?");
+        $stmt->bind_param("ss", $email, $password);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $count = $result->num_rows;
+        $data = $result->fetch_array();
+
         if ($count > 0) {
             $_SESSION["ltype"] = $ltype;
             $_SESSION["memail"] = $data[4];
@@ -69,6 +80,7 @@ if (isset($_POST['submit'])) {
         } else {
             $error = "Invalid Mechanic Email/Password";
         }
+        $stmt->close();
     }
 }
 ?>
@@ -112,16 +124,6 @@ if (isset($_POST['submit'])) {
                     <input type="submit" name="submit" value="Login" class="btn btn-success"><br><br>
                     <a href="register.php" class="text-warning">Register as Customer</a><br>
                     <a href="mregister.php" class="text-warning">Register as Mechanic</a>
-                </div>
-                
-                <!-- Test credentials for easy testing -->
-                <div class="form-group mx-sm-3">
-                    <small class="text-warning">
-                        <strong>Test Admin Login:</strong><br>
-                        Email: admin@gmail.com<br>
-                        Password: admin<br>
-                        Select: Admin
-                    </small>
                 </div>
             </div>
         </font>

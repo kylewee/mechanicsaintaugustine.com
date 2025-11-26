@@ -7,23 +7,50 @@ dist/
 
 # Environment and configuration
 .env
+.env.local
+.env.local.php
+*.env.local.php
+*.env.*.local
 config.local.php
 
 # IDE
 .vscode/
+*.code-workspace
+.idea/
 
-# Ignore backup files
+# Backup files (IMPORTANT: Never commit backups)
 backups/
 *.tar.gz
 *.backup
+*.bak
+*.bak.*
+*~
 
-# Ignore temporary files
+# Temporary files
 tmp/
 temp/
 *.tmp
+*.cache
 
-# Ignore logs
+# Logs
+logs/
 *.log
 api/quote_intake.log
 api/sms_incoming.log
-<file>
+api/*.log
+quote/*.log
+voice/*.log
+admin/*.log
+
+# Database dumps (never commit)
+*.sql
+*.sqlite
+*.db
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Composer
+vendor/
+composer.lock

@@ -7,9 +7,8 @@ if (isset($_SESSION['cemail'])) {
 <html>
     <head>
         <link href="styles.css" rel="stylesheet" type="text/css" media="screen" />
-		<link href='http://fonts.googleapis.com/css?family=Voltaire' rel='stylesheet' type='text/css'>
+		<link href='https://fonts.googleapis.com/css?family=Voltaire' rel='stylesheet' type='text/css'>
         <link href="images/style.css" rel="stylesheet" type="text/css" />
-        <link href='http://fonts.googleapis.com/css?family=Voltaire' rel='stylesheet' type='text/css'>
         <link rel="stylesheet" href="CSS/jquery-ui.css">
         <link rel="stylesheet" href="CSS/bootstrap.min.css" />
 		<script src="JS/jquery.min.js"></script>  
