@@ -7,11 +7,11 @@ function extract_customer_data_ai($transcript) {
     return extract_customer_data_patterns($transcript);
   }
   
-  $prompt = "You are analyzing a phone call transcript for a mobile mechanic service. Extract customer information and return ONLY a JSON object with these exact keys (use null for missing data):
+  $prompt = "You are analyzing a phone call transcript between a mobile mechanic and a customer. The mechanic asks questions and the customer answers. Extract the CUSTOMER's information (not the mechanic's) and return ONLY a JSON object with these exact keys (use null for missing data):
 
 {
   \"first_name\": \"customer's first name\",
-  \"last_name\": \"customer's last name\", 
+  \"last_name\": \"customer's last name\",
   \"phone\": \"phone number in format like 9045551234 (digits only)\",
   \"address\": \"location/address mentioned\",
   \"year\": \"vehicle year (4 digits)\",
@@ -22,12 +22,23 @@ function extract_customer_data_ai($transcript) {
 }
 
 Rules:
-- Extract actual customer info, not business/agent details
-- For phone: digits only, no formatting
+- When mechanic asks \"What's your first name?\" or \"First name?\", the customer's ANSWER is the first name
+- When mechanic asks \"Last name?\", the customer's ANSWER is the last name
+- Extract actual customer info ONLY, ignore anything the mechanic says
+- Ignore words like \"OK\", \"alright\", \"got it\" - those are confirmations, not data
+- For phone: digits only, no formatting (example: 9045551234)
 - For year: must be 4-digit year between 1990-2030
-- For make/model: standardize common brands (Honda, Toyota, etc.)
-- For notes: summarize the actual problem/service needed
-- Return null for any field that's not clearly stated
+- For make/model: standardize common brands (Honda, Toyota, Ford, Chevy, etc.)
+- For notes: summarize the actual problem/service the customer needs
+- Return null for any field that's not clearly stated in the transcript
+- Do not make up or guess any information
+
+Example call flow:
+Mechanic: \"What's your first name?\"
+Customer: \"John\"
+Mechanic: \"OK, and last name?\"
+Customer: \"Smith\"
+→ Extract: first_name=\"John\", last_name=\"Smith\"
 
 Transcript: " . $transcript;
 
