@@ -20,11 +20,17 @@ jobs:
 
       - name: Install dependencies
         run: |
-          echo "Running install (uses npm ci if lockfile exists, otherwise npm install)"
-          if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
-            npm ci --no-progress
+          if [ -f package.json ]; then
+            echo "package.json found - proceeding with npm install"
+            if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
+              echo "Lockfile found - running npm ci"
+              npm ci --no-progress
+            else
+              echo "No lockfile found - running npm install"
+              npm install --no-progress
+            fi
           else
-            npm install --no-progress
+            echo "package.json not found - skipping npm install step"
           fi
 
       - name: Lint (if present)
